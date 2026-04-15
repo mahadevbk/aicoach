@@ -298,3 +298,6 @@ if uploaded_file:
             
             with st.expander("Preview AI Prompt Brief"):
                 st.code(final_prompt)
+            
+            with st.expander("Preview JSON Metadata"):
+                st.json(final_json["metadata"])
