@@ -24,11 +24,20 @@ st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
 
-    /* Global Styles */
+    /* Main Background and Text */
     .stApp {
         background: radial-gradient(circle at top right, #1e293b, #020617);
         color: #f8fafc;
         font-family: 'Inter', sans-serif;
+    }
+
+    /* Top Bar Gradient */
+    .stHeader {
+        background: linear-gradient(90deg, #38bdf8 0%, #6366f1 100%) !important;
+        height: 3rem !important;
+    }
+    .stHeader * {
+        color: white !important;
     }
 
     /* Glassmorphic Card Container */
