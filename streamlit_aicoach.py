@@ -168,9 +168,15 @@ def render_video(input_path, skeletal_data, stroke_label, w, h, fps):
 # --- APP UI ---
 
 st.title("🎾 Not Coach Nikki")
-st.markdown("Upload your tennis video to get skeletal analysis and AI coaching prompts.")
+st.markdown("""
+### **How it works:**
+1.  **Upload** your tennis swing video (.mp4, .mov, or .avi).
+2.  **Confirm** the detected motion (or manually select it).
+3.  **Generate** and **Download** your analysis ZIP package.
+4.  **Get Coached:** Upload the **JSON** and paste the **Prompt** from the ZIP into an AI (like **ChatGPT**, **Claude**, or **Gemini**) for your technical breakdown!
+""")
 
-uploaded_file = st.file_uploader("Upload Video", type=["mp4", "mov", "avi"])
+uploaded_file = st.file_uploader("Step 1: Upload Video", type=["mp4", "mov", "avi"])
 
 if uploaded_file:
     # 1. Save uploaded file to temp
