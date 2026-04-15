@@ -130,8 +130,8 @@ def render_video(input_path, skeletal_data, stroke_label, w, h, fps):
     """Generates a video with skeletal overlay and black bar."""
     cap = cv2.VideoCapture(input_path)
     temp_output = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4")
-    # Using 'avc1' or 'mp4v' for streamlit compatibility
-    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    # Using 'avc1' for H.264 web-compatible encoding (OpenCV may fall back to mp4v if not compiled with x264)
+    fourcc = cv2.VideoWriter_fourcc(*'avc1')
     out = cv2.VideoWriter(temp_output.name, fourcc, fps, (w, h + 250))
     
     instructions = STROKE_INFO.get(stroke_label, "Provide general biomechanic feedback.")
@@ -235,63 +235,57 @@ if uploaded_file:
         st.divider()
         st.subheader("Results")
         
-        res_col1, res_col2 = st.columns([2, 1])
+        st.success("Analysis Complete!")
         
-        with res_col1:
-            st.video(st.session_state['processed_video'])
+        # Prepare JSON
+        final_json = {
+            "metadata": {
+                "stroke": st.session_state['final_stroke'],
+                "max_x_factor": round(st.session_state['max_x'], 1),
+                "peak_reach": round(1 - st.session_state['peak_reach'], 3),
+                "fps": st.session_state['fps']
+            },
+            "skeletal_data": st.session_state['skeletal_data']
+        }
+        json_str = json.dumps(final_json, indent=4)
         
-        with res_col2:
-            st.success("Analysis Complete!")
-            
-            # Prepare JSON
-            final_json = {
-                "metadata": {
-                    "stroke": st.session_state['final_stroke'],
-                    "max_x_factor": round(st.session_state['max_x'], 1),
-                    "peak_reach": round(1 - st.session_state['peak_reach'], 3),
-                    "fps": st.session_state['fps']
-                },
-                "skeletal_data": st.session_state['skeletal_data']
-            }
-            json_str = json.dumps(final_json, indent=4)
-            
-            # Prepare Prompt
-            instr = STROKE_INFO[st.session_state['final_stroke']]
-            final_prompt = (
-                f"USER: I am uploading a JSON of my tennis skeletal data.\n"
-                f"DETECTION: The app identified this as a {st.session_state['final_stroke']}.\n"
-                f"INSTRUCTIONS: Act as a World-Class Tennis Biomechanics Coach. {instr}\n"
-                "Use the provided skeletal time-series data to find power leaks in my kinetic chain.\n"
-                "Examine Landmark 0 (Head) for balance and Landmarks 27-32 (Feet) for weight transfer."
-            )
-            
-            # Create ZIP in memory
-            zip_buffer = io.BytesIO()
-            with zipfile.ZipFile(zip_buffer, "w") as zip_file:
-                # Add video
-                with open(st.session_state['processed_video'], "rb") as f:
-                    zip_file.writestr("analysed_video.mp4", f.read())
-                # Add JSON
-                zip_file.writestr("motion_data.json", json_str)
-                # Add Prompt
-                zip_file.writestr("coach_prompt.txt", final_prompt)
-            
-            # Download Buttons
-            st.info("💡 **Next Step:** Upload the **JSON** and paste the **Prompt** into an AI (like ChatGPT, Claude, or Gemini) to get your personalized coaching report!")
-            
-            st.download_button(
-                label="📦 Download All (ZIP)",
-                data=zip_buffer.getvalue(),
-                file_name="tennis_analysis_pack.zip",
-                mime="application/zip",
-                use_container_width=True
-            )
-            
-            st.divider()
-
+        # Prepare Prompt
+        instr = STROKE_INFO[st.session_state['final_stroke']]
+        final_prompt = (
+            f"USER: I am uploading a JSON of my tennis skeletal data.\n"
+            f"DETECTION: The app identified this as a {st.session_state['final_stroke']}.\n"
+            f"INSTRUCTIONS: Act as a World-Class Tennis Biomechanics Coach. {instr}\n"
+            "Use the provided skeletal time-series data to find power leaks in my kinetic chain.\n"
+            "Examine Landmark 0 (Head) for balance and Landmarks 27-32 (Feet) for weight transfer."
+        )
+        
+        # Create ZIP in memory
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, "w") as zip_file:
+            # Add video
             with open(st.session_state['processed_video'], "rb") as f:
-                st.download_button("Download Video Only", f, "analysed_video.mp4", "video/mp4", use_container_width=True)
-            
-            st.download_button("Download JSON Only", json_str, "motion_data.json", "application/json", use_container_width=True)
-            
-            st.download_button("Download Prompt Only", final_prompt, "coach_prompt.txt", "text/plain", use_container_width=True)
+                zip_file.writestr("analysed_video.mp4", f.read())
+            # Add JSON
+            zip_file.writestr("motion_data.json", json_str)
+            # Add Prompt
+            zip_file.writestr("coach_prompt.txt", final_prompt)
+        
+        # Download Buttons
+        st.info("💡 **Next Step:** Upload the **JSON** and paste the **Prompt** into an AI (like ChatGPT, Claude, or Gemini) to get your personalized coaching report!")
+        
+        st.download_button(
+            label="📦 Download All (ZIP)",
+            data=zip_buffer.getvalue(),
+            file_name="tennis_analysis_pack.zip",
+            mime="application/zip",
+            use_container_width=True
+        )
+        
+        st.divider()
+
+        with open(st.session_state['processed_video'], "rb") as f:
+            st.download_button("Download Video Only", f, "analysed_video.mp4", "video/mp4", use_container_width=True)
+        
+        st.download_button("Download JSON Only", json_str, "motion_data.json", "application/json", use_container_width=True)
+        
+        st.download_button("Download Prompt Only", final_prompt, "coach_prompt.txt", "text/plain", use_container_width=True)
