@@ -59,7 +59,7 @@ st.markdown("""
         -webkit-text-fill-color: transparent;
         text-align: center;
         margin-bottom: 0px !important;
-        filter: drop-shadow(0 0 15px rgba(204, 255, 0, 0.4)); /* OPTIC YELLOW SHADOW */
+        filter: drop-shadow(0 0 4px rgba(204, 255, 0, 0.9)); /* SHARPER OPTIC YELLOW SHADOW */
     }
     
     .hero-subtext {
