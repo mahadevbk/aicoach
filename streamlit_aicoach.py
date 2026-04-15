@@ -295,9 +295,3 @@ if uploaded_file:
             st.download_button("Download JSON Only", json_str, "motion_data.json", "application/json", use_container_width=True)
             
             st.download_button("Download Prompt Only", final_prompt, "coach_prompt.txt", "text/plain", use_container_width=True)
-            
-            with st.expander("Preview AI Prompt Brief"):
-                st.code(final_prompt)
-            
-            with st.expander("Preview JSON Metadata"):
-                st.json(final_json["metadata"])
