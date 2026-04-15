@@ -37,118 +37,111 @@ st.markdown("""
         backdrop-filter: blur(12px);
         border: 1px solid rgba(255, 255, 255, 0.1);
         border-radius: 24px;
-        padding: 2rem;
+        padding: 1.5rem;
         margin-bottom: 2rem;
-        transition: transform 0.3s ease, box-shadow 0.3s ease;
-    }
-    .glass-card:hover {
-        transform: translateY(-4px);
-        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
-        border: 1px solid rgba(56, 189, 248, 0.3);
     }
 
     /* Typography */
     h1 {
-        font-size: 4rem !important;
+        font-size: clamp(2rem, 8vw, 3.5rem) !important;
         font-weight: 800 !important;
-        letter-spacing: -2px !important;
         background: linear-gradient(to right, #38bdf8, #818cf8);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
         text-align: center;
-        margin-bottom: 0.5rem !important;
+        margin-bottom: 0px !important;
     }
     
     .hero-subtext {
         text-align: center;
         color: #94a3b8;
+        font-size: 0.8rem;
+        margin-bottom: 2rem;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+    }
+
+    /* STEP TRACKER - FORCED HORIZONTAL ROW */
+    .process-wrapper {
+        display: flex !important;
+        flex-direction: row !important;
+        flex-wrap: nowrap !important;
+        justify-content: space-around !important;
+        align-items: flex-start !important;
+        width: 100% !important;
+        margin: 1rem 0 3rem 0 !important;
+        gap: 5px !important;
+    }
+
+    .process-step {
+        flex: 1 1 0px !important;
+        text-align: center !important;
+        min-width: 0 !important;
+    }
+
+    .process-icon-circle {
+        width: 40px;
+        height: 40px;
+        background: rgba(56, 189, 248, 0.1);
+        border: 1px solid rgba(56, 189, 248, 0.3);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 8px auto;
         font-size: 1.2rem;
-        margin-bottom: 3rem;
+    }
+
+    .process-label {
+        font-size: 0.65rem !important;
+        font-weight: 700;
+        color: #38bdf8;
+        text-transform: uppercase;
+        display: block;
+    }
+
+    .process-desc {
+        font-size: 0.55rem !important;
+        color: #64748b;
+        display: block;
+        margin-top: 2px;
     }
 
     /* Tabs Styling */
     .stTabs [data-baseweb="tab-list"] {
-        gap: 2rem;
+        gap: 0.5rem;
         justify-content: center;
-        background: transparent;
-        padding: 1rem;
     }
 
     .stTabs [data-baseweb="tab"] {
-        height: 100px;
-        min-width: 240px;
+        height: 60px;
+        min-width: 140px;
         background: rgba(255, 255, 255, 0.03) !important;
-        border-radius: 20px !important;
-        border: 1px solid rgba(255, 255, 255, 0.1) !important;
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        border-radius: 12px !important;
     }
 
     .stTabs [data-baseweb="tab"] p {
-        font-size: 32px !important;
+        font-size: 18px !important;
         font-weight: 700 !important;
-        color: #64748b !important;
     }
 
     .stTabs [aria-selected="true"] {
-        background: rgba(56, 189, 248, 0.1) !important;
         border: 1px solid #38bdf8 !important;
-        box-shadow: 0 0 30px rgba(56, 189, 248, 0.2);
-    }
-
-    .stTabs [aria-selected="true"] p {
-        color: #38bdf8 !important;
     }
 
     /* Buttons */
     .stButton > button {
         background: linear-gradient(135deg, #38bdf8 0%, #6366f1 100%) !important;
         color: white !important;
-        border: none !important;
-        padding: 0.75rem 2rem !important;
-        border-radius: 14px !important;
+        border-radius: 12px !important;
         font-weight: 700 !important;
-        font-size: 1.1rem !important;
-        text-transform: uppercase;
-        letter-spacing: 1px;
-        transition: all 0.3s ease !important;
         width: 100%;
-        height: 60px;
+        height: 50px;
     }
 
-    .stButton > button:hover {
-        transform: scale(1.02);
-        box-shadow: 0 10px 25px rgba(56, 189, 248, 0.4) !important;
-    }
-
-    /* File Uploader */
-    [data-testid="stFileUploader"] {
-        background: rgba(255, 255, 255, 0.02);
-        border: 2px dashed rgba(56, 189, 248, 0.3);
-        border-radius: 20px;
-        padding: 2rem;
-    }
-
-    /* Metric Cards */
-    [data-testid="stMetricValue"] {
-        font-size: 2.5rem !important;
-        font-weight: 800 !important;
-        color: #38bdf8 !important;
-    }
-    
-    [data-testid="stMetricLabel"] {
-        font-size: 1rem !important;
-        color: #94a3b8 !important;
-        text-transform: uppercase;
-        letter-spacing: 1px;
-    }
-
-    /* Sidebar/Info Overrides */
-    .stAlert {
-        border-radius: 16px;
-        background-color: rgba(56, 189, 248, 0.1);
-        border: 1px solid rgba(56, 189, 248, 0.2);
-        color: #e2e8f0;
-    }
+    /* Metrics */
+    [data-testid="stMetricValue"] { font-size: 1.8rem !important; color: #38bdf8 !important; }
+    [data-testid="stMetricLabel"] { font-size: 0.75rem !important; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -180,7 +173,7 @@ GOLF_INFO = {
     "Unclassified Swing": "General postural and rotation analysis."
 }
 
-# --- HELPER FUNCTIONS ---
+# --- FUNCTIONS ---
 def calculate_angle(a, b, c):
     ba, bc = a - b, c - b
     cosine_angle = np.dot(ba, bc) / (np.linalg.norm(ba) * np.linalg.norm(bc))
@@ -194,8 +187,7 @@ def extract_landmarks(video_path):
     cap = cv2.VideoCapture(video_path)
     fps, w, h = cap.get(cv2.CAP_PROP_FPS), int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     total_frames, skeletal_series, timestamp_ms = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)), [], 0
-    
-    progress_bar = st.progress(0, text="SKELETAL EXTRACTION")
+    progress_bar = st.progress(0, text="ANALYZING FRAMES")
     for i in range(total_frames):
         ret, frame = cap.read()
         if not ret: break
@@ -205,7 +197,6 @@ def extract_landmarks(video_path):
         skeletal_series.append(lm)
         timestamp_ms += (1000 / fps)
         progress_bar.progress((i + 1) / total_frames)
-    
     cap.release()
     progress_bar.empty()
     return skeletal_series, fps, (w, h)
@@ -251,8 +242,7 @@ def render_video(input_path, skeletal_data, stroke_label, info_dict, w, h, fps):
     temp_output = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4")
     out = cv2.VideoWriter(temp_output.name, cv2.VideoWriter_fourcc(*'avc1'), fps, (w, h + 250))
     instr = info_dict.get(stroke_label, "General Analysis")
-    progress_bar = st.progress(0, text="RENDERING PRO VIDEO")
-    
+    progress_bar = st.progress(0, text="GENERATING REPORT")
     for i, frame_data in enumerate(skeletal_data):
         ret, frame = cap.read()
         if not ret: break
@@ -262,11 +252,10 @@ def render_video(input_path, skeletal_data, stroke_label, info_dict, w, h, fps):
             for s, e in POSE_CONNECTIONS:
                 p1, p2 = (int(frame_data[s]['x']*w), int(frame_data[s]['y']*h)), (int(frame_data[e]['x']*w), int(frame_data[e]['y']*h))
                 cv2.line(canvas, p1, p2, (0, 255, 127), 6)
-        cv2.putText(canvas, f"PRO ANALYSIS: {stroke_label}", (50, h + 100), cv2.FONT_HERSHEY_SIMPLEX, 1.8, (255, 255, 255), 4)
-        cv2.putText(canvas, f"FOCUS: {instr}", (50, h + 180), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (200, 200, 200), 2)
+        cv2.putText(canvas, f"MOTION: {stroke_label}", (50, h + 100), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (255, 255, 255), 3)
+        cv2.putText(canvas, f"GOAL: {instr}", (50, h + 180), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (200, 200, 200), 2)
         out.write(canvas)
         progress_bar.progress((i + 1) / len(skeletal_data))
-    
     cap.release()
     out.release()
     progress_bar.empty()
@@ -274,35 +263,40 @@ def render_video(input_path, skeletal_data, stroke_label, info_dict, w, h, fps):
 
 # --- APP LAYOUT ---
 st.markdown("<h1>NOT COACH NIKKI</h1>", unsafe_allow_html=True)
-st.markdown("<p class='hero-subtext'>PREMIUM SPORTS BIOMECHANICS ENGINE</p>", unsafe_allow_html=True)
+st.markdown("<p class='hero-subtext'>Pro Sports Biomechanics</p>", unsafe_allow_html=True)
 
-# How it Works Section
-cols = st.columns(4)
-steps = [
-    ("📤", "UPLOAD", "High-FPS video file"),
-    ("⚙️", "DETECT", "AI-driven motion sync"),
-    ("📐", "ANALYZE", "Kinetic chain metrics"),
-    ("🚀", "DOWNLOAD", "AI-ready coaching pack")
-]
-for col, (icon, title, desc) in zip(cols, steps):
-    with col:
-        st.markdown(f"""
-            <div style='text-align: center; background: rgba(255,255,255,0.03); padding: 1.5rem; border-radius: 20px;'>
-                <div style='font-size: 2.5rem; margin-bottom: 0.5rem;'>{icon}</div>
-                <div style='font-weight: 800; font-size: 0.9rem; letter-spacing: 1px; color: #38bdf8;'>{title}</div>
-                <div style='font-size: 0.8rem; color: #94a3b8;'>{desc}</div>
-            </div>
-        """, unsafe_allow_html=True)
-
-st.markdown("<br>", unsafe_allow_html=True)
+# FIXED ROW OF ICONS
+st.markdown("""
+    <div class="process-wrapper">
+        <div class="process-step">
+            <div class="process-icon-circle">📤</div>
+            <span class="process-label">Upload</span>
+            <span class="process-desc">Video</span>
+        </div>
+        <div class="process-step">
+            <div class="process-icon-circle">⚙️</div>
+            <span class="process-label">Detect</span>
+            <span class="process-desc">Motion</span>
+        </div>
+        <div class="process-step">
+            <div class="process-icon-circle">📐</div>
+            <span class="process-label">Analyze</span>
+            <span class="process-desc">Angles</span>
+        </div>
+        <div class="process-step">
+            <div class="process-icon-circle">🚀</div>
+            <span class="process-label">Ready</span>
+            <span class="process-desc">Download</span>
+        </div>
+    </div>
+""", unsafe_allow_html=True)
 
 tab1, tab2 = st.tabs(["TENNIS 🎾", "GOLF ⛳"])
 
 with tab1:
     st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
     st.info("PRO TENNIS ENGINE: Supports Serve, Smash, Lob, Drive, Slice, and Volleys.")
-    up_t = st.file_uploader("DROP TENNIS SWING VIDEO", type=["mp4", "mov", "avi"], key="t_up")
-    
+    up_t = st.file_uploader("UPLOAD TENNIS VIDEO", type=["mp4", "mov", "avi"], key="t_up")
     if up_t:
         tfile = tempfile.NamedTemporaryFile(delete=False)
         tfile.write(up_t.read())
@@ -310,20 +304,16 @@ with tab1:
             with st.spinner("SYNCING KINETIC DATA..."):
                 skeletal, fps, dims = extract_landmarks(tfile.name)
                 stroke, max_x, peak, spine_var = classify_motion(skeletal, "Tennis")
-                st.session_state.update({
-                    't_skeletal': skeletal, 't_fps': fps, 't_dims': dims,
-                    't_stroke': stroke, 't_max_x': max_x, 't_peak': peak,
-                    't_vid_name': up_t.name, 't_processed': None
-                })
+                st.session_state.update({'t_skeletal': skeletal, 't_fps': fps, 't_dims': dims, 't_stroke': stroke, 't_max_x': max_x, 't_peak': peak, 't_vid_name': up_t.name, 't_processed': None})
         
         st.markdown("<br>", unsafe_allow_html=True)
         col1, col2 = st.columns([1, 2])
         with col1:
             st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
-            st.subheader("ANALYSIS SETTINGS")
-            st.warning("⚠️ Beta: Confirm detected motion.")
-            sel_t = st.selectbox("DETECTED STROKE", list(TENNIS_INFO.keys()), index=list(TENNIS_INFO.keys()).index(st.session_state['t_stroke']))
-            if st.button("RUN PRO ANALYSIS", key="t_btn"):
+            st.subheader("SETTINGS")
+            st.warning("⚠️ Verify motion below.")
+            sel_t = st.selectbox("STROKE", list(TENNIS_INFO.keys()), index=list(TENNIS_INFO.keys()).index(st.session_state['t_stroke']))
+            if st.button("RUN ANALYSIS", key="t_btn"):
                 st.session_state['t_processed'] = render_video(tfile.name, st.session_state['t_skeletal'], sel_t, TENNIS_INFO, *st.session_state['t_dims'], st.session_state['t_fps'])
                 st.session_state['t_final_stroke'] = sel_t
             st.markdown("</div>", unsafe_allow_html=True)
@@ -331,31 +321,26 @@ with tab1:
         if st.session_state.get('t_processed'):
             with col2:
                 st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
-                st.subheader("SESSION ANALYTICS")
+                st.subheader("RESULTS")
                 m1, m2, m3 = st.columns(3)
                 m1.metric("X-FACTOR", f"{round(st.session_state['t_max_x'], 1)}°")
-                m2.metric("PEAK REACH", f"{round(1 - st.session_state['t_peak'], 2)}m")
-                m3.metric("STATUS", "COMPLETED")
-                
-                st.success("Analysis pack ready for download.")
-                t_json = json.dumps({"metadata": {"sport": "Tennis", "stroke": st.session_state['t_final_stroke'], "max_x": st.session_state['t_max_x']}, "data": st.session_state['t_skeletal']}, indent=4)
-                t_prompt = f"USER: Uploading skeletal JSON for a Tennis {st.session_state['t_final_stroke']}. {TENNIS_INFO[st.session_state['t_final_stroke']]} Review Landmark 0 for balance."
-                
+                m2.metric("REACH", f"{round(1 - st.session_state['t_peak'], 2)}m")
+                m3.metric("STATUS", "DONE")
+                t_json = json.dumps({"metadata": {"stroke": st.session_state['t_final_stroke'], "max_x": st.session_state['t_max_x']}, "data": st.session_state['t_skeletal']}, indent=4)
+                t_prompt = f"USER: Analyzing Tennis {st.session_state['t_final_stroke']}. {TENNIS_INFO[st.session_state['t_final_stroke']]}"
                 zip_t = io.BytesIO()
                 with zipfile.ZipFile(zip_t, "w") as zf:
-                    with open(st.session_state['t_processed'], "rb") as f: zf.writestr("pro_analysis.mp4", f.read())
-                    zf.writestr("motion_data.json", t_json)
-                    zf.writestr("coach_prompt.txt", t_prompt)
-                
-                st.download_button("📦 DOWNLOAD PRO PACK", zip_t.getvalue(), "tennis_pro_pack.zip", "application/zip")
+                    with open(st.session_state['t_processed'], "rb") as f: zf.writestr("analysis.mp4", f.read())
+                    zf.writestr("data.json", t_json)
+                    zf.writestr("prompt.txt", t_prompt)
+                st.download_button("📦 DOWNLOAD PACK", zip_t.getvalue(), "tennis_pack.zip", "application/zip")
                 st.markdown("</div>", unsafe_allow_html=True)
     st.markdown("</div>", unsafe_allow_html=True)
 
 with tab2:
     st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
     st.info("PRO GOLF ENGINE: Supports Driver, Irons, Pitching, and Putting Analysis.")
-    up_g = st.file_uploader("DROP GOLF SWING VIDEO", type=["mp4", "mov", "avi"], key="g_up")
-    
+    up_g = st.file_uploader("UPLOAD GOLF SWING", type=["mp4", "mov", "avi"], key="g_up")
     if up_g:
         gfile = tempfile.NamedTemporaryFile(delete=False)
         gfile.write(up_g.read())
@@ -363,20 +348,16 @@ with tab2:
             with st.spinner("SYNCING KINETIC DATA..."):
                 skeletal, fps, dims = extract_landmarks(gfile.name)
                 stroke, max_x, peak, spine_var = classify_motion(skeletal, "Golf")
-                st.session_state.update({
-                    'g_skeletal': skeletal, 'g_fps': fps, 'g_dims': dims,
-                    'g_stroke': stroke, 'g_max_x': max_x, 'g_spine_var': spine_var,
-                    'g_vid_name': up_g.name, 'g_processed': None
-                })
+                st.session_state.update({'g_skeletal': skeletal, 'g_fps': fps, 'g_dims': dims, 'g_stroke': stroke, 'g_max_x': max_x, 'g_spine_var': spine_var, 'g_vid_name': up_g.name, 'g_processed': None})
         
         st.markdown("<br>", unsafe_allow_html=True)
         col1, col2 = st.columns([1, 2])
         with col1:
             st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
-            st.subheader("ANALYSIS SETTINGS")
-            st.warning("⚠️ Beta: Confirm swing type.")
-            sel_g = st.selectbox("DETECTED SWING", list(GOLF_INFO.keys()), index=list(GOLF_INFO.keys()).index(st.session_state['g_stroke']))
-            if st.button("RUN PRO ANALYSIS", key="g_btn"):
+            st.subheader("SETTINGS")
+            st.warning("⚠️ Verify swing type.")
+            sel_g = st.selectbox("SWING", list(GOLF_INFO.keys()), index=list(GOLF_INFO.keys()).index(st.session_state['g_stroke']))
+            if st.button("RUN ANALYSIS", key="g_btn"):
                 st.session_state['g_processed'] = render_video(gfile.name, st.session_state['g_skeletal'], sel_g, GOLF_INFO, *st.session_state['g_dims'], st.session_state['g_fps'])
                 st.session_state['g_final_stroke'] = sel_g
             st.markdown("</div>", unsafe_allow_html=True)
@@ -384,23 +365,19 @@ with tab2:
         if st.session_state.get('g_processed'):
             with col2:
                 st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
-                st.subheader("SESSION ANALYTICS")
+                st.subheader("RESULTS")
                 m1, m2, m3 = st.columns(3)
                 m1.metric("X-FACTOR", f"{round(st.session_state['g_max_x'], 1)}°")
                 stability = round(100 - min(st.session_state['g_spine_var'] * 10, 100), 1)
-                m2.metric("SPINE STABILITY", f"{stability}%")
-                m3.metric("STATUS", "COMPLETED")
-                
-                st.success("Analysis pack ready for download.")
-                g_json = json.dumps({"metadata": {"sport": "Golf", "swing": st.session_state['g_final_stroke'], "x_factor": st.session_state['g_max_x'], "stability": stability}, "data": st.session_state['g_skeletal']}, indent=4)
-                g_prompt = f"USER: Uploading skeletal JSON for a Golf {st.session_state['g_final_stroke']}. {GOLF_INFO[st.session_state['g_final_stroke']]} Stability: {stability}%. Analyze for early extension."
-                
+                m2.metric("STABILITY", f"{stability}%")
+                m3.metric("STATUS", "DONE")
+                g_json = json.dumps({"metadata": {"swing": st.session_state['g_final_stroke'], "x_factor": st.session_state['g_max_x'], "stability": stability}, "data": st.session_state['g_skeletal']}, indent=4)
+                g_prompt = f"USER: Analyzing Golf {st.session_state['g_final_stroke']}. Stability: {stability}%. {GOLF_INFO[st.session_state['g_final_stroke']]}"
                 zip_g = io.BytesIO()
                 with zipfile.ZipFile(zip_g, "w") as zf:
-                    with open(st.session_state['g_processed'], "rb") as f: zf.writestr("pro_golf_analysis.mp4", f.read())
-                    zf.writestr("golf_data.json", g_json)
-                    zf.writestr("golf_coach_prompt.txt", g_prompt)
-                
-                st.download_button("📦 DOWNLOAD PRO PACK", zip_g.getvalue(), "golf_pro_pack.zip", "application/zip")
+                    with open(st.session_state['g_processed'], "rb") as f: zf.writestr("analysis.mp4", f.read())
+                    zf.writestr("data.json", g_json)
+                    zf.writestr("prompt.txt", g_prompt)
+                st.download_button("📦 DOWNLOAD PACK", zip_g.getvalue(), "golf_pack.zip", "application/zip")
                 st.markdown("</div>", unsafe_allow_html=True)
     st.markdown("</div>", unsafe_allow_html=True)
