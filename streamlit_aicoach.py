@@ -22,13 +22,13 @@ st.set_page_config(
 # --- PREMIUM CSS STYLING ---
 st.markdown("""
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Roboto+Flex:wght@100..1000&display=swap');
 
     /* Main Background and Text */
     .stApp {
         background: radial-gradient(circle at top right, #1e293b, #020617);
         color: #f8fafc;
-        font-family: 'Inter', sans-serif;
+        font-family: 'Roboto Flex', sans-serif;
     }
 
     /* Top Bar Gradient */
