@@ -205,7 +205,8 @@ if uploaded_file:
     
     with col1:
         st.subheader("Analysis Settings")
-        st.info(f"Autodetected: **{st.session_state['detected_stroke']}**")
+        st.warning("⚠️ **Autodetection is in Beta.** Please verify the motion below.")
+        st.info(f"Detected: **{st.session_state['detected_stroke']}**")
         
         selected_stroke = st.selectbox(
             "Confirm or manually choose motion:",
@@ -295,4 +296,6 @@ if uploaded_file:
             st.download_button("Download Prompt Only", final_prompt, "coach_prompt.txt", "text/plain", use_container_width=True)
             
             with st.expander("Preview AI Prompt Brief"):
+                st.code(final_prompt)
+ Brief"):
                 st.code(final_prompt)
