@@ -269,6 +269,8 @@ if uploaded_file:
                 zip_file.writestr("coach_prompt.txt", final_prompt)
             
             # Download Buttons
+            st.info("💡 **Next Step:** Upload the **JSON** and paste the **Prompt** into an AI (like ChatGPT, Claude, or Gemini) to get your personalized coaching report!")
+            
             st.download_button(
                 label="📦 Download All (ZIP)",
                 data=zip_buffer.getvalue(),
