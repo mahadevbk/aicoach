@@ -14,6 +14,80 @@ import io
 # --- CONSTANTS & CONFIG ---
 st.set_page_config(page_title="Not Coach Nikki", layout="wide", page_icon="🎾")
 
+# Custom CSS for Premium UI
+st.markdown("""
+    <style>
+    /* Main Background and Text */
+    .stApp {
+        background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+        color: #f8fafc;
+    }
+    
+    /* Header Styling */
+    h1 {
+        font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+        font-weight: 800;
+        letter-spacing: -1px;
+        background: -webkit-linear-gradient(#38bdf8, #818cf8);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        text-align: center;
+        padding-bottom: 2rem;
+    }
+
+    /* Tab Styling - THE KEY REQUEST */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 24px;
+        justify-content: center;
+        background-color: rgba(255, 255, 255, 0.05);
+        padding: 10px;
+        border-radius: 15px;
+    }
+
+    .stTabs [data-baseweb="tab"] {
+        height: 70px;
+        white-space: pre-wrap;
+        background-color: transparent;
+        border-radius: 10px;
+        color: #94a3b8;
+        font-size: 24px; /* LARGE TABS */
+        font-weight: 600;
+        transition: all 0.3s ease;
+    }
+
+    .stTabs [aria-selected="true"] {
+        background-color: rgba(56, 189, 248, 0.2) !important;
+        color: #38bdf8 !important;
+        border-bottom: 4px solid #38bdf8 !important;
+    }
+
+    /* Button Styling */
+    .stButton > button {
+        background: linear-gradient(90deg, #38bdf8 0%, #818cf8 100%);
+        color: white;
+        border: none;
+        padding: 15px 30px;
+        border-radius: 12px;
+        font-weight: bold;
+        box-shadow: 0 4px 15px rgba(56, 189, 248, 0.3);
+        transition: all 0.3s ease;
+        width: 100%;
+    }
+    
+    .stButton > button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(56, 189, 248, 0.4);
+    }
+
+    /* Info/Warning Boxes */
+    .stAlert {
+        background-color: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 12px;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
 POSE_CONNECTIONS = [
     (0, 1), (1, 2), (2, 3), (3, 7), (0, 4), (4, 5), (5, 6), (6, 8), (9, 10),
     (11, 12), (11, 13), (13, 15), (12, 14), (14, 16), (11, 23), (12, 24),
