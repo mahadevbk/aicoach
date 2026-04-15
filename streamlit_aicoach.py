@@ -59,7 +59,7 @@ st.markdown("""
         -webkit-text-fill-color: transparent;
         text-align: center;
         margin-bottom: 0px !important;
-        filter: drop-shadow(2px 2px 0.5px rgba(204, 255, 0, 0.9)); /* DIFFUSED GRADIENT SHADOW */
+        filter: drop-shadow(4px 4px 12px rgba(204, 255, 0, 0.6)); /* DIFFUSED GRADIENT SHADOW */
     }
     
     .hero-subtext {
@@ -257,7 +257,15 @@ def classify_motion(skeletal_data, mode="Tennis"):
 def render_video(input_path, skeletal_data, stroke_label, info_dict, w, h, fps):
     cap = cv2.VideoCapture(input_path)
     temp_output = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4")
-    out = cv2.VideoWriter(temp_output.name, cv2.VideoWriter_fourcc(*'avc1'), fps, (w, h + 250))
+    
+    # Use 'mp4v' for maximum compatibility on cloud servers without hardware acceleration
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    
+    # Dimension and FPS safety check
+    if w <= 0 or h <= 0 or fps <= 0:
+        fps, w, h = 30.0, 1280, 720
+        
+    out = cv2.VideoWriter(temp_output.name, fourcc, fps, (w, h + 250))
     instr = info_dict.get(stroke_label, "General Analysis")
     progress_bar = st.progress(0, text="GENERATING REPORT")
     for i, frame_data in enumerate(skeletal_data):
