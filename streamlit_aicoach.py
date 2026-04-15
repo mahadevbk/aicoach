@@ -123,10 +123,17 @@ st.markdown("""
     .stTabs [data-baseweb="tab"] p {
         font-size: 18px !important;
         font-weight: 700 !important;
+        color: #94a3b8 !important; /* MEDIUM GREY */
+    }
+
+    .stTabs [aria-selected="true"] p {
+        color: #ccff00 !important; /* OPTIC YELLOW */
+        text-shadow: 0 0 10px rgba(204, 255, 0, 0.2);
     }
 
     .stTabs [aria-selected="true"] {
-        border: 1px solid #38bdf8 !important;
+        border: 1px solid #ccff00 !important;
+        background: rgba(204, 255, 0, 0.05) !important;
     }
 
     /* Buttons */
