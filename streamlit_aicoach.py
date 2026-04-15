@@ -8,9 +8,11 @@ from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
 import tempfile
 import time
+import zipfile
+import io
 
 # --- CONSTANTS & CONFIG ---
-st.set_page_config(page_title="AI Tennis Coach", layout="wide", page_icon="🎾")
+st.set_page_config(page_title="Not Coach Nikki", layout="wide", page_icon="🎾")
 
 POSE_CONNECTIONS = [
     (0, 1), (1, 2), (2, 3), (3, 7), (0, 4), (4, 5), (5, 6), (6, 8), (9, 10),
@@ -165,7 +167,7 @@ def render_video(input_path, skeletal_data, stroke_label, w, h, fps):
 
 # --- APP UI ---
 
-st.title("🎾 AI Tennis Coach v3")
+st.title("🎾 Not Coach Nikki")
 st.markdown("Upload your tennis video to get skeletal analysis and AI coaching prompts.")
 
 uploaded_file = st.file_uploader("Upload Video", type=["mp4", "mov", "avi"])
@@ -217,7 +219,7 @@ if uploaded_file:
                 
                 output_video_path = render_video(video_path, skeletal_data, selected_stroke, w, h, fps)
                 
-                # Convert to h264 for browser compatibility if needed (skipping for now, mp4v usually works)
+                # Store results in session state
                 st.session_state['processed_video'] = output_video_path
                 st.session_state['final_stroke'] = selected_stroke
 
@@ -255,15 +257,34 @@ if uploaded_file:
                 "Examine Landmark 0 (Head) for balance and Landmarks 27-32 (Feet) for weight transfer."
             )
             
+            # Create ZIP in memory
+            zip_buffer = io.BytesIO()
+            with zipfile.ZipFile(zip_buffer, "w") as zip_file:
+                # Add video
+                with open(st.session_state['processed_video'], "rb") as f:
+                    zip_file.writestr("analysed_video.mp4", f.read())
+                # Add JSON
+                zip_file.writestr("motion_data.json", json_str)
+                # Add Prompt
+                zip_file.writestr("coach_prompt.txt", final_prompt)
+            
             # Download Buttons
+            st.download_button(
+                label="📦 Download All (ZIP)",
+                data=zip_buffer.getvalue(),
+                file_name="tennis_analysis_pack.zip",
+                mime="application/zip",
+                use_container_width=True
+            )
+            
+            st.divider()
+
             with open(st.session_state['processed_video'], "rb") as f:
-                st.download_button("Download Analysed Video", f, "analysed_video.mp4", "video/mp4", use_container_width=True)
+                st.download_button("Download Video Only", f, "analysed_video.mp4", "video/mp4", use_container_width=True)
             
-            st.download_button("Download JSON Data", json_str, "motion_data.json", "application/json", use_container_width=True)
+            st.download_button("Download JSON Only", json_str, "motion_data.json", "application/json", use_container_width=True)
             
-            st.download_button("Download AI Prompt Brief", final_prompt, "coach_prompt.txt", "text/plain", use_container_width=True)
+            st.download_button("Download Prompt Only", final_prompt, "coach_prompt.txt", "text/plain", use_container_width=True)
             
             with st.expander("Preview AI Prompt Brief"):
                 st.code(final_prompt)
-
-    # Cleanup temp video file on finish? Usually Streamlit handles temp files well but good to know.
