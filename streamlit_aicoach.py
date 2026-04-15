@@ -37,22 +37,32 @@ st.markdown("""
 
     /* Tab Styling - THE KEY REQUEST */
     .stTabs [data-baseweb="tab-list"] {
-        gap: 24px;
+        gap: 40px;
         justify-content: center;
         background-color: rgba(255, 255, 255, 0.05);
-        padding: 10px;
-        border-radius: 15px;
+        padding: 20px;
+        border-radius: 20px;
+        height: 100px;
     }
 
     .stTabs [data-baseweb="tab"] {
-        height: 70px;
-        white-space: pre-wrap;
         background-color: transparent;
-        border-radius: 10px;
+        border-radius: 12px;
         color: #94a3b8;
-        font-size: 24px; /* LARGE TABS */
-        font-weight: 600;
         transition: all 0.3s ease;
+    }
+
+    /* Target the text inside the tab specifically */
+    .stTabs [data-baseweb="tab"] p {
+        font-size: 42px !important; /* MASSIVE TEXT */
+        font-weight: 800 !important;
+        margin: 0;
+        padding: 0 20px;
+    }
+
+    .stTabs [aria-selected="true"] p {
+        color: #38bdf8 !important;
+        text-shadow: 0 0 20px rgba(56, 189, 248, 0.4);
     }
 
     .stTabs [aria-selected="true"] {
