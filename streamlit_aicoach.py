@@ -171,7 +171,8 @@ st.title("🎾 Not Coach Nikki")
 st.markdown("""
 ### **How it works:**
 1.  **Upload** your tennis swing video (.mp4, .mov, or .avi).
-2.  **Confirm** the detected motion (or manually select it).
+2.  **Confirm** the detected motion (or manually select it). 
+    *⚠️ **Note:** Autodetection is currently in **Beta**. Please cross-check and manually select the correct movement if needed!*
 3.  **Generate** and **Download** your analysis ZIP package.
 4.  **Get Coached:** Upload the **JSON** and paste the **Prompt** from the ZIP into an AI (like **ChatGPT**, **Claude**, or **Gemini**) for your technical breakdown!
 """)
@@ -296,6 +297,4 @@ if uploaded_file:
             st.download_button("Download Prompt Only", final_prompt, "coach_prompt.txt", "text/plain", use_container_width=True)
             
             with st.expander("Preview AI Prompt Brief"):
-                st.code(final_prompt)
- Brief"):
                 st.code(final_prompt)
