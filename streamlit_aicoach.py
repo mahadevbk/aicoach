@@ -36,7 +36,7 @@ STROKE_INFO = {
 def extract_landmarks(video_path):
     """Processes video with MediaPipe and returns skeletal data and metadata."""
     detector = vision.PoseLandmarker.create_from_options(vision.PoseLandmarkerOptions(
-        base_options=python.BaseOptions(model_asset_path='pose_landmarker_heavy.task'),
+        base_options=python.BaseOptions(model_asset_path='pose_landmarker_lite.task'),
         running_mode=vision.RunningMode.VIDEO
     ))
     
