@@ -27,12 +27,12 @@ st.markdown("""
     h1 { font-size: clamp(2rem, 8vw, 3.5rem) !important; font-weight: 800 !important; background: linear-gradient(to right, #38bdf8, #818cf8); -webkit-background-clip: text; -webkit-text-fill-color: transparent; text-align: center; margin-bottom: 0px !important; filter: drop-shadow(4px 4px 0.5px rgba(204, 255, 0, 0.8)); }
     .hero-subtext { text-align: center; color: #94a3b8; font-size: 0.8rem; margin-bottom: 2rem; text-transform: uppercase; letter-spacing: 2px; }
     .stTabs [data-baseweb="tab-list"] { gap: 0.5rem; justify-content: center; flex-wrap: wrap; }
-    .stTabs [data-baseweb="tab"] { height: 50px; min-width: 130px; background: rgba(255, 255, 255, 0.03) !important; border-radius: 12px !important; margin: 5px; }
+    .stTabs [data-baseweb="tab"] { height: 50px; min-width: 110px; background: rgba(255, 255, 255, 0.03) !important; border-radius: 12px !important; margin: 5px; }
     .stTabs [aria-selected="true"] p { color: #ccff00 !important; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- CONSTANTS & CONFIGS ---
+# --- CONSTANTS ---
 POSE_CONNECTIONS = [(0, 1), (1, 2), (2, 3), (3, 7), (0, 4), (4, 5), (5, 6), (6, 8), (9, 10), (11, 12), (11, 13), (13, 15), (12, 14), (14, 16), (11, 23), (12, 24), (23, 24), (23, 25), (25, 27), (24, 26), (26, 28), (27, 29), (28, 30), (29, 31), (30, 32), (27, 31), (28, 32)]
 
 SPORT_CONFIGS = {
@@ -62,6 +62,17 @@ SPORT_CONFIGS = {
         "Iron Swing": "Downward strike and lead arm extension.",
         "Putting": "Pendulum motion and head stability.",
         "Practice Sequence": "Multi-shot consistency tracking."
+    },
+    "GYM 🏋️": {
+        "Back Squat": "Analyze depth, knee tracking, and torso angle.",
+        "Deadlift": "Focus on lumbar neutrality, hip hinge, and bar path.",
+        "Bench Press": "Evaluate bar path consistency and elbow tuck.",
+        "Overhead Press": "Check for vertical path and core bracing.",
+        "Bicep Curl": "Analyze elbow drive and momentum usage.",
+        "Lateral Raise": "Evaluate shoulder abduction and trap compensation.",
+        "Push-Up": "Focus on scapular movement and plank stability.",
+        "Pull-Up": "Analyze pull-through and shoulder blade retraction.",
+        "Burpee": "Evaluate explosive transition and landing mechanics."
     },
     "BADMINTON 🏸": {
         "Jump Smash": "Vertical leap and overhead whip speed.",
@@ -110,7 +121,7 @@ def render_video(input_path, skeletal_data, stroke_label, info_dict, w, h, fps):
     temp_output = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4")
     out = cv2.VideoWriter(temp_output.name, cv2.VideoWriter_fourcc(*'mp4v'), fps if fps > 0 else 30.0, (w, h + 200))
     instr = info_dict.get(stroke_label, "General Analysis")
-    progress_bar = st.progress(0, text="RENDERING OVERLAY...")
+    progress_bar = st.progress(0, text="RENDERING BIOMECHANICS...")
     for i, frame_data in enumerate(skeletal_data):
         ret, frame = cap.read()
         if not ret: break
@@ -119,7 +130,7 @@ def render_video(input_path, skeletal_data, stroke_label, info_dict, w, h, fps):
             for s, e in POSE_CONNECTIONS:
                 p1, p2 = (int(frame_data[s]['x']*w), int(frame_data[s]['y']*h)), (int(frame_data[e]['x']*w), int(frame_data[e]['y']*h))
                 cv2.line(canvas, p1, p2, (0, 255, 127), 4)
-        cv2.putText(canvas, f"MOTION: {stroke_label}", (40, h + 80), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (255, 255, 255), 2)
+        cv2.putText(canvas, f"DETECTION: {stroke_label}", (40, h + 80), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (255, 255, 255), 2)
         cv2.putText(canvas, f"GOAL: {instr}", (40, h + 140), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (200, 200, 200), 1)
         out.write(canvas); progress_bar.progress((i + 1) / len(skeletal_data))
     cap.release(); out.release(); progress_bar.empty()
@@ -134,6 +145,9 @@ tabs = st.tabs(list(SPORT_CONFIGS.keys()))
 for i, (sport, actions) in enumerate(SPORT_CONFIGS.items()):
     with tabs[i]:
         st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
+        # RESTORED ENGINE DESCRIPTION LINE
+        st.info(f"PRO {sport} ENGINE: AI-Optimized for {', '.join(actions.keys())}")
+        
         up_file = st.file_uploader(f"UPLOAD {sport} VIDEO", type=["mp4", "mov", "avi"], key=f"up_{sport}")
         
         if up_file:
@@ -151,37 +165,28 @@ for i, (sport, actions) in enumerate(SPORT_CONFIGS.items()):
             
             st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
             col1, col2 = st.columns([1, 1])
-            with col1: sel_action = st.selectbox("SELECT ACTION", list(actions.keys()), key=f"sel_{sport}")
+            with col1: sel_action = st.selectbox("SELECT EXERCISE/ACTION", list(actions.keys()), key=f"sel_{sport}")
             with col2: analyze_btn = st.button("RUN PRO ANALYSIS", key=f"btn_{sport}")
             
             if analyze_btn:
                 processed_path = render_video(tfile.name, data['skeletal'], sel_action, actions, *data['dims'], data['fps'])
                 
-                # --- ENHANCED AI PROMPT ---
+                # ENHANCED AI PROMPT
                 detailed_prompt = f"""
-ACT AS A PROFESSIONAL {sport.upper()} COACH AND BIOMECHANIST.
-ANALYSIS TARGET: {sel_action}
-TECHNICAL GOAL: {actions[sel_action]}
+ACT AS A PROFESSIONAL { "STRENGTH COACH" if sport == "GYM 🏋️" else sport.upper() + " COACH" } AND BIOMECHANIST.
+TARGET: {sel_action}
+TECHNICAL FOCUS: {actions[sel_action]}
 
 CONTEXT:
-The user has provided a video of their performance. Attached is a 'data.json' containing 33 MediaPipe skeletal landmarks (x, y, z coordinates and visibility) for every single frame of the motion.
+Analyzing skeletal data from a MediaPipe 33-landmark mesh.
 
 INSTRUCTIONS:
-1. Examine the skeletal trajectory in the data. Look for flaws in the kinetic chain, balance issues, or improper joint alignment.
-2. For {sport}, specifically check:
-   - Kinetic Linkage: Is power being transferred from the ground up through the core to the { "bat" if "CRICKET" in sport else "racket/club" }?
-   - Balance: Is the center of gravity stable during the peak of the motion?
-   - Extension: Is there full extension at the contact/release point?
-3. Provide a 'Pro-Level' breakdown:
-   - 'The Good': What parts of the biomechanics are fundamentally sound?
-   - 'The Flaw': Identify 1-2 specific technical errors visible in the movement paths.
-   - 'The Drill': Suggest one high-value drill to fix the identified flaw.
-
-Provide the feedback in a supportive, high-performance coaching tone. Use the 'data.json' to justify your findings (e.g., "The drop in shoulder Y-coordinate at frame 45 indicates...").
+1. Examine joint angles and stability.
+2. Check for range of motion (ROM) and postural integrity.
+3. For {sport}, evaluate the specific movement cues required for {sel_action}.
+4. Provide feedback: 'The Good', 'The Flaw' (based on specific data points), and 'The Drill/Adjustment'.
 """
-                
                 json_data = json.dumps({"metadata": {"sport": sport, "action": sel_action}, "skeletal_frames": data['skeletal']}, indent=4)
-                
                 zip_buffer = io.BytesIO()
                 with zipfile.ZipFile(zip_buffer, "w") as zf:
                     with open(processed_path, "rb") as f: zf.writestr("analysis.mp4", f.read())
@@ -193,4 +198,6 @@ Provide the feedback in a supportive, high-performance coaching tone. Use the 'd
             st.markdown("</div>", unsafe_allow_html=True)
         st.markdown("</div>", unsafe_allow_html=True)
 
-st.info("🔒 Your videos are processed locally. No data is stored once the session is closed.")
+# --- GLOBAL FOOTER ---
+st.markdown("<br>", unsafe_allow_html=True)
+st.info("🔒 **Privacy Note:** Your videos are processed locally in memory. No data, videos, or skeletal metrics are stored on our servers once the session is closed.")
