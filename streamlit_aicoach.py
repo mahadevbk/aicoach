@@ -30,7 +30,6 @@ st.markdown("""
     .stTabs [data-baseweb="tab-list"] { gap: 0.5rem; justify-content: center; flex-wrap: wrap; }
     .stTabs [data-baseweb="tab"] { height: 50px; min-width: 130px; background: rgba(255, 255, 255, 0.03) !important; border-radius: 12px !important; margin: 5px; }
     .stTabs [aria-selected="true"] p { color: #ccff00 !important; }
-    .stButton > button { background: linear-gradient(135deg, #38bdf8 0%, #6366f1 100%) !important; color: white !important; font-weight: 700 !important; border-radius: 12px !important; width: 100%; height: 50px; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -112,18 +111,6 @@ def extract_landmarks(video_path):
     progress_bar.empty()
     return skeletal_series, fps, (w, h)
 
-def classify_motion(skeletal_data, sport_name):
-    if not skeletal_data or all(x is None for x in skeletal_data):
-        return list(SPORT_CONFIGS[sport_name].keys())[0], 0, 0
-    hip_xs = [lm[23]['x'] for lm in skeletal_data if lm]
-    wrist_ys = [lm[15]['y'] for lm in skeletal_data if lm]
-    movement_range = max(hip_xs) - min(hip_xs) if hip_xs else 0
-    vertical_reach = 1 - min(wrist_ys) if wrist_ys else 0
-    if "CRICKET" in sport_name:
-        return ("Fast Bowling" if movement_range > 0.2 else "Drive"), 65.0, vertical_reach
-    if movement_range > 0.15: return "General Rally", 45.0, movement_range
-    return list(SPORT_CONFIGS[sport_name].keys())[0], 30.0, vertical_reach
-
 def render_video(input_path, skeletal_data, stroke_label, info_dict, w, h, fps):
     cap = cv2.VideoCapture(input_path)
     temp_output = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4")
@@ -147,7 +134,7 @@ def render_video(input_path, skeletal_data, stroke_label, info_dict, w, h, fps):
     cap.release(); out.release(); progress_bar.empty()
     return temp_output.name
 
-# --- UI LAYOUT ---
+# --- APP LAYOUT ---
 st.markdown("<h1>NOT COACH NIKKI</h1>", unsafe_allow_html=True)
 st.markdown("<p class='hero-subtext'>Pro Sports Biomechanics</p>", unsafe_allow_html=True)
 
@@ -159,6 +146,7 @@ for i, sport in enumerate(tab_list):
     with tabs[i]:
         st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
         up_file = st.file_uploader(f"UPLOAD {sport} VIDEO", type=["mp4", "mov", "avi"], key=f"up_{sport}")
+        
         if up_file:
             tfile = tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(up_file.name)[1])
             tfile.write(up_file.read())
@@ -167,26 +155,48 @@ for i, sport in enumerate(tab_list):
             if state_key not in st.session_state or st.session_state.get(f"name_{sport}") != up_file.name:
                 with st.spinner("CALIBRATING SKELETAL MESH..."):
                     skeletal, fps, dims = extract_landmarks(tfile.name)
-                    stroke, x_fact, reach = classify_motion(skeletal, sport)
-                    st.session_state[state_key] = {"skeletal": skeletal, "fps": fps, "dims": dims, "stroke": stroke, "x_fact": x_fact, "reach": reach, "processed": None}
+                    st.session_state[state_key] = {"skeletal": skeletal, "fps": fps, "dims": dims, "processed": None}
                     st.session_state[f"name_{sport}"] = up_file.name
 
             data = st.session_state[state_key]
-            col1, col2 = st.columns([1, 2])
+            
+            st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
+            col1, col2 = st.columns([1, 1])
             with col1:
-                st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
-                sel_action = st.selectbox("DETECTED ACTION", list(actions.keys()), index=list(actions.keys()).index(data['stroke']) if data['stroke'] in actions else 0, key=f"sel_{sport}")
-                if st.button("RUN PRO ANALYSIS", key=f"btn_{sport}"):
-                    processed_path = render_video(tfile.name, data['skeletal'], sel_action, actions, *data['dims'], data['fps'])
-                    st.session_state[state_key]['processed'] = processed_path
-                    st.session_state[state_key]['final_stroke'] = sel_action
-                st.markdown("</div>", unsafe_allow_html=True)
-
-            if st.session_state[state_key]['processed']:
-                with col2:
-                    st.video(st.session_state[state_key]['processed'])
-                    st.download_button("📦 DOWNLOAD ANALYSIS", open(st.session_state[state_key]['processed'], "rb").read(), f"{sport.lower()}_analysis.mp4", "video/mp4")
+                sel_action = st.selectbox("SELECT ACTION", list(actions.keys()), key=f"sel_{sport}")
+            with col2:
+                analyze_btn = st.button("RUN PRO ANALYSIS", key=f"btn_{sport}")
+            
+            if analyze_btn:
+                processed_path = render_video(tfile.name, data['skeletal'], sel_action, actions, *data['dims'], data['fps'])
+                
+                # --- DATA PACK GENERATION ---
+                json_data = json.dumps({
+                    "metadata": {"sport": sport, "action": sel_action, "info": actions[sel_action]},
+                    "skeletal_frames": data['skeletal']
+                }, indent=4)
+                
+                ai_prompt = f"USER: Analyzing {sport} {sel_action}. {actions[sel_action]} Provide professional biomechanical coaching feedback based on this motion data."
+                
+                zip_buffer = io.BytesIO()
+                with zipfile.ZipFile(zip_buffer, "w") as zf:
+                    with open(processed_path, "rb") as f:
+                        zf.writestr("analysis.mp4", f.read())
+                    zf.writestr("data.json", json_data)
+                    zf.writestr("prompt.txt", ai_prompt)
+                
+                st.success("Analysis Complete!")
+                st.download_button(
+                    label="📦 DOWNLOAD PRO PACK",
+                    data=zip_buffer.getvalue(),
+                    file_name=f"{sport.lower().replace(' ', '_')}_pack.zip",
+                    mime="application/zip",
+                    key=f"dl_{sport}"
+                )
+            st.markdown("</div>", unsafe_allow_html=True)
         st.markdown("</div>", unsafe_allow_html=True)
 
+# --- GLOBAL FOOTER ---
 st.markdown("<br>", unsafe_allow_html=True)
 st.info("🔒 **Privacy Note:** Your videos are processed locally in memory. No data, videos, or skeletal metrics are stored on our servers once the session is closed.")
+st.info("Built with ❤️ using [Streamlit](https://streamlit.io/) — free and open source. [Other Scripts by dev](https://devs-scripts.streamlit.app/)")
