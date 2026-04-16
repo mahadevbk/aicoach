@@ -59,7 +59,7 @@ st.markdown("""
         -webkit-text-fill-color: transparent;
         text-align: center;
         margin-bottom: 0px !important;
-        filter: drop-shadow(4px 4px 1px rgba(204, 255, 0, 0.6)); /* DIFFUSED GRADIENT SHADOW */
+        filter: drop-shadow(4px 4px 0.5px rgba(204, 255, 0, 0.8)); /* DIFFUSED GRADIENT SHADOW */
     }
     
     .hero-subtext {
