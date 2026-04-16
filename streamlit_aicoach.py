@@ -59,7 +59,7 @@ st.markdown("""
         -webkit-text-fill-color: transparent;
         text-align: center;
         margin-bottom: 0px !important;
-        filter: drop-shadow(4px 4px 12px rgba(204, 255, 0, 0.6)); /* DIFFUSED GRADIENT SHADOW */
+        filter: drop-shadow(4px 4px 2px rgba(204, 255, 0, 0.6)); /* DIFFUSED GRADIENT SHADOW */
     }
     
     .hero-subtext {
@@ -406,3 +406,7 @@ with tab2:
                 st.download_button("📦 DOWNLOAD PACK", zip_g.getvalue(), "golf_pack.zip", "application/zip")
                 st.markdown("</div>", unsafe_allow_html=True)
     st.markdown("</div>", unsafe_allow_html=True)
+
+st.markdown("<br>", unsafe_allow_html=True)
+st.info("🔒 **Privacy Note:** Your videos are processed locally in memory. No data, videos, or skeletal metrics are stored on our servers once the session is closed.")
+st.info("Built with ❤️ using [Streamlit](https://streamlit.io/) — free and open source. [Other Scripts by dev](https://devs-scripts.streamlit.app/) on Streamlit.")
