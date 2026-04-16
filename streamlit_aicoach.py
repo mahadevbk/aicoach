@@ -30,11 +30,18 @@ st.markdown("""
     .stTabs [data-baseweb="tab-list"] { gap: 0.5rem; justify-content: center; flex-wrap: wrap; }
     .stTabs [data-baseweb="tab"] { height: 50px; min-width: 130px; background: rgba(255, 255, 255, 0.03) !important; border-radius: 12px !important; margin: 5px; }
     .stTabs [aria-selected="true"] p { color: #ccff00 !important; }
+    .stButton > button { background: linear-gradient(135deg, #38bdf8 0%, #6366f1 100%) !important; color: white !important; font-weight: 700 !important; border-radius: 12px !important; width: 100%; height: 50px; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- ORDERED SPORT DICTIONARIES ---
-# Arrangement: Tennis, Padel, Pickleball, Golf, Badminton, Cricket Batting, Cricket Bowling
+# --- CONSTANTS ---
+POSE_CONNECTIONS = [
+    (0, 1), (1, 2), (2, 3), (3, 7), (0, 4), (4, 5), (5, 6), (6, 8), (9, 10),
+    (11, 12), (11, 13), (13, 15), (12, 14), (14, 16), (11, 23), (12, 24),
+    (23, 24), (23, 25), (25, 27), (24, 26), (26, 28), (27, 29), (28, 30),
+    (29, 31), (30, 32), (27, 31), (28, 32)
+]
+
 SPORT_CONFIGS = {
     "TENNIS 🎾": {
         "Serve": "Analyze toss alignment and extension.",
@@ -80,37 +87,70 @@ SPORT_CONFIGS = {
     }
 }
 
-# --- CORE FUNCTIONS ---
+# --- FUNCTIONS ---
+def extract_landmarks(video_path):
+    detector = vision.PoseLandmarker.create_from_options(vision.PoseLandmarkerOptions(
+        base_options=python.BaseOptions(model_asset_path='pose_landmarker_lite.task'),
+        running_mode=vision.RunningMode.VIDEO
+    ))
+    cap = cv2.VideoCapture(video_path)
+    fps = cap.get(cv2.CAP_PROP_FPS)
+    w, h = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    skeletal_series, timestamp_ms = [], 0
+    progress_bar = st.progress(0, text="SCANNING BIOMETRICS...")
+    for i in range(total_frames):
+        ret, frame = cap.read()
+        if not ret: break
+        mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+        res = detector.detect_for_video(mp_image, int(timestamp_ms))
+        lm = [{"x": p.x, "y": p.y, "z": p.z, "v": p.visibility} for p in res.pose_landmarks[0]] if res.pose_landmarks else None
+        skeletal_series.append(lm)
+        timestamp_ms += (1000 / (fps if fps > 0 else 30))
+        progress_bar.progress((i + 1) / total_frames)
+    cap.release()
+    progress_bar.empty()
+    return skeletal_series, fps, (w, h)
+
 def classify_motion(skeletal_data, sport_name):
     if not skeletal_data or all(x is None for x in skeletal_data):
         return list(SPORT_CONFIGS[sport_name].keys())[0], 0, 0
-    
-    # Check for lateral movement (Rallies/Run-ups)
     hip_xs = [lm[23]['x'] for lm in skeletal_data if lm]
     wrist_ys = [lm[15]['y'] for lm in skeletal_data if lm]
-    
     movement_range = max(hip_xs) - min(hip_xs) if hip_xs else 0
     vertical_reach = 1 - min(wrist_ys) if wrist_ys else 0
-    
-    # Sport-Specific Classification Logic
     if "CRICKET" in sport_name:
-        if "BOWLING" in sport_name:
-            return "Fast Bowling" if movement_range > 0.25 else "Spin Bowling", 15.0, vertical_reach
-        return "Drive", 65.0, movement_range # Batting Default
-    
-    # Racket/Golf Rally Logic
-    if movement_range > 0.20:
-        if "BADMINTON" in sport_name: return "High-Intensity Rally", 45.0, movement_range
-        if "GOLF" in sport_name: return "Practice Sequence", 10.0, movement_range
-        return "General Rally", 45.0, movement_range
-    
+        return ("Fast Bowling" if movement_range > 0.2 else "Drive"), 65.0, vertical_reach
+    if movement_range > 0.15: return "General Rally", 45.0, movement_range
     return list(SPORT_CONFIGS[sport_name].keys())[0], 30.0, vertical_reach
 
-# --- UI LOGIC ---
+def render_video(input_path, skeletal_data, stroke_label, info_dict, w, h, fps):
+    cap = cv2.VideoCapture(input_path)
+    temp_output = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4")
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    out = cv2.VideoWriter(temp_output.name, fourcc, fps if fps > 0 else 30.0, (w, h + 200))
+    instr = info_dict.get(stroke_label, "Analyze alignment.")
+    progress_bar = st.progress(0, text="RENDERING BIOMECHANICS...")
+    for i, frame_data in enumerate(skeletal_data):
+        ret, frame = cap.read()
+        if not ret: break
+        canvas = np.zeros((h + 200, w, 3), dtype=np.uint8)
+        canvas[0:h, 0:w] = frame
+        if frame_data:
+            for s, e in POSE_CONNECTIONS:
+                p1, p2 = (int(frame_data[s]['x']*w), int(frame_data[s]['y']*h)), (int(frame_data[e]['x']*w), int(frame_data[e]['y']*h))
+                cv2.line(canvas, p1, p2, (0, 255, 127), 4)
+        cv2.putText(canvas, f"DETECTION: {stroke_label}", (40, h + 80), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (255, 255, 255), 2)
+        cv2.putText(canvas, f"GOAL: {instr}", (40, h + 140), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (200, 200, 200), 1)
+        out.write(canvas)
+        progress_bar.progress((i + 1) / len(skeletal_data))
+    cap.release(); out.release(); progress_bar.empty()
+    return temp_output.name
+
+# --- UI LAYOUT ---
 st.markdown("<h1>NOT COACH NIKKI</h1>", unsafe_allow_html=True)
 st.markdown("<p class='hero-subtext'>Pro Sports Biomechanics</p>", unsafe_allow_html=True)
 
-# Generate Tabs in Specific Order
 tab_list = list(SPORT_CONFIGS.keys())
 tabs = st.tabs(tab_list)
 
@@ -118,51 +158,35 @@ for i, sport in enumerate(tab_list):
     actions = SPORT_CONFIGS[sport]
     with tabs[i]:
         st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
-        st.info(f"PRO {sport} ENGINE")
-        
         up_file = st.file_uploader(f"UPLOAD {sport} VIDEO", type=["mp4", "mov", "avi"], key=f"up_{sport}")
-        
         if up_file:
-            # Temporary file handling
-            suffix = os.path.splitext(up_file.name)[1]
-            with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tfile:
-                tfile.write(up_file.read())
-                temp_path = tfile.name
+            tfile = tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(up_file.name)[1])
+            tfile.write(up_file.read())
             
             state_key = f"data_{sport}"
-            # Check for existing data to prevent flicker
             if state_key not in st.session_state or st.session_state.get(f"name_{sport}") != up_file.name:
-                with st.spinner("ANALYZING MOTION PATHS..."):
-                    # This uses the extraction functions from your previous script logic
-                    # skeletal, fps, dims = extract_landmarks(temp_path)
-                    # stroke, x_fact, reach = classify_motion(skeletal, sport)
-                    
-                    # Placeholder for session update (Logic remains same as your original)
-                    st.session_state[state_key] = {"stroke": classify_motion([], sport)[0], "reach": 0.8} 
+                with st.spinner("CALIBRATING SKELETAL MESH..."):
+                    skeletal, fps, dims = extract_landmarks(tfile.name)
+                    stroke, x_fact, reach = classify_motion(skeletal, sport)
+                    st.session_state[state_key] = {"skeletal": skeletal, "fps": fps, "dims": dims, "stroke": stroke, "x_fact": x_fact, "reach": reach, "processed": None}
                     st.session_state[f"name_{sport}"] = up_file.name
 
+            data = st.session_state[state_key]
             col1, col2 = st.columns([1, 2])
             with col1:
                 st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
-                sel_action = st.selectbox("DETECTED ACTION", list(actions.keys()), key=f"sel_{sport}")
-                st.write(f"💡 **AI Goal:** {actions[sel_action]}")
-                st.button("RUN PRO ANALYSIS", key=f"btn_{sport}")
-                st.markdown("</div>", unsafe_allow_html=True)
-            
-            with col2:
-                st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
-                st.subheader("METRICS")
-                if "BOWLING" in sport:
-                    st.metric("RELEASE HEIGHT", "2.12m", "0.05m")
-                elif "BATTING" in sport:
-                    st.metric("ELBOW ANGLE", "165°", "Perfect")
-                else:
-                    st.metric("STABILITY", "92%", "Good")
+                sel_action = st.selectbox("DETECTED ACTION", list(actions.keys()), index=list(actions.keys()).index(data['stroke']) if data['stroke'] in actions else 0, key=f"sel_{sport}")
+                if st.button("RUN PRO ANALYSIS", key=f"btn_{sport}"):
+                    processed_path = render_video(tfile.name, data['skeletal'], sel_action, actions, *data['dims'], data['fps'])
+                    st.session_state[state_key]['processed'] = processed_path
+                    st.session_state[state_key]['final_stroke'] = sel_action
                 st.markdown("</div>", unsafe_allow_html=True)
 
+            if st.session_state[state_key]['processed']:
+                with col2:
+                    st.video(st.session_state[state_key]['processed'])
+                    st.download_button("📦 DOWNLOAD ANALYSIS", open(st.session_state[state_key]['processed'], "rb").read(), f"{sport.lower()}_analysis.mp4", "video/mp4")
         st.markdown("</div>", unsafe_allow_html=True)
 
-# --- GLOBAL FOOTER ---
 st.markdown("<br>", unsafe_allow_html=True)
 st.info("🔒 **Privacy Note:** Your videos are processed locally in memory. No data, videos, or skeletal metrics are stored on our servers once the session is closed.")
-st.info("Built with ❤️ using [Streamlit](https://streamlit.io/) — free and open source. [Other Scripts by dev](https://devs-scripts.streamlit.app/)")
