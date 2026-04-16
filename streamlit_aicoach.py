@@ -35,7 +35,7 @@ st.markdown("""
 # --- CONSTANTS ---
 POSE_CONNECTIONS = [(0, 1), (1, 2), (2, 3), (3, 7), (0, 4), (4, 5), (5, 6), (6, 8), (9, 10), (11, 12), (11, 13), (13, 15), (12, 14), (14, 16), (11, 23), (12, 24), (23, 24), (23, 25), (25, 27), (24, 26), (26, 28), (27, 29), (28, 30), (29, 31), (30, 32), (27, 31), (28, 32)]
 
-# ARRANGEMENT: Tennis, Padel, Pickleball, Golf, Badminton, Cricket Batting, Cricket Bowling, Gym
+# ARRANGEMENT: Tennis, Padel, Pickleball, Golf, Badminton, Cricket Batting, Cricket Bowling, Gym, Yoga
 SPORT_CONFIGS = {
     "TENNIS 🎾": {
         "Serve": "Analyze toss height, trophy position, and kinetic chain.",
@@ -92,6 +92,18 @@ SPORT_CONFIGS = {
         "Pull-Ups/Chin-Ups": "Check for full dead-hang to chin-over-bar ROM.",
         "Plank": "Analyze spine neutrality and shoulder stack.",
         "Burpees": "Evaluate explosive transition and hip mobility."
+    },
+    "YOGA 🧘": {
+        "Tadasana (Mountain Pose)": "Analyze vertical alignment, weight distribution, and shoulder retraction.",
+        "Adho Mukha Svanasana (Downward Dog)": "Focus on spine length, hip elevation, and heel depth.",
+        "Vrikshasana (Tree Pose)": "Evaluate unilateral balance and pelvic stability.",
+        "Virabhadrasana I (Warrior 1)": "Analyze front knee tracking and back foot grounding.",
+        "Virabhadrasana II (Warrior 2)": "Check hip opening, arm horizontal alignment, and gaze.",
+        "Trikonasana (Triangle Pose)": "Analyze lateral spine extension and shoulder stacking.",
+        "Chaturanga Dandasana (Four-Limbed Staff)": "Evaluate core rigidity and 90-degree elbow alignment.",
+        "Bhujangasana (Cobra Pose)": "Analyze lumbar vs. thoracic extension and shoulder-ear gap.",
+        "Utkatasana (Chair Pose)": "Check knee-to-toe relationship and arm extension angle.",
+        "Bakasana (Crow Pose)": "Focus on center of gravity and arm balance stability."
     }
 }
 
@@ -146,7 +158,7 @@ tabs = st.tabs(list(SPORT_CONFIGS.keys()))
 for i, (sport, actions) in enumerate(SPORT_CONFIGS.items()):
     with tabs[i]:
         st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
-        # RESTORED ENGINE DESCRIPTION LINE
+        # ENGINE DESCRIPTION LINE
         st.info(f"PRO {sport} ENGINE: AI-Optimized for {', '.join(actions.keys())}")
         
         up_file = st.file_uploader(f"UPLOAD {sport} VIDEO", type=["mp4", "mov", "avi"], key=f"up_{sport}")
@@ -172,7 +184,7 @@ for i, (sport, actions) in enumerate(SPORT_CONFIGS.items()):
             if analyze_btn:
                 processed_path = render_video(tfile.name, data['skeletal'], sel_action, actions, *data['dims'], data['fps'])
                 
-                # HYPER-DETAILED AI PROMPT FOR MAXIMUM VALUE
+                # HYPER-DETAILED AI PROMPT 
                 detailed_prompt = f"""
 ACT AS AN ELITE BIOMECHANIST AND PERFORMANCE COACH. 
 YOU ARE ANALYZING A {sport.upper()} SESSION, SPECIFICALLY THE {sel_action.upper()}.
@@ -180,19 +192,19 @@ YOU ARE ANALYZING A {sport.upper()} SESSION, SPECIFICALLY THE {sel_action.upper(
 MOVEMENT OBJECTIVE: {actions[sel_action]}
 
 INPUT DATA:
-- Attached 'data.json' contains full 3D skeletal landmark coordinates (MediaPipe format) for the entire movement.
+- Attached 'data.json' contains full 3D skeletal landmark coordinates (MediaPipe format).
 - Attached 'analysis.mp4' shows the visual skeletal overlay.
 
 COACHING REQUIREMENTS:
-1. **Critical Form Evaluation**: Compare the user's joint trajectories against 'Gold Standard' biomechanics for {sel_action}.
-2. **Kinetic Chain Audit**: Identify if power is being generated correctly (e.g., from the floor up in a squat, or through the core in a tennis drive).
-3. **Safety Analysis**: Highlight any high-risk joint angles (e.g., knee valgus, lumbar rounding, or shoulder impingement risks).
+1. **Critical Form Evaluation**: Compare the user's joint trajectories and isometric holds against optimal biomechanics for {sel_action}.
+2. **Alignment Audit**: { "Identify joint stacking (wrists over shoulders, knees over ankles) and spinal neutrality." if sport == "YOGA 🧘" else "Identify if power is being generated correctly through the kinetic chain." }
+3. **Safety Analysis**: Highlight any high-risk joint angles or loss of core tension.
 4. **Data-Driven Feedback**: 
-   - 'THE GOOD': What frame ranges show the strongest technical execution?
-   - 'THE ERROR': Pinpoint 1 specific biomechanical flaw using the JSON data (e.g., 'Hip height stays too high during the squat descent').
-   - 'THE CUE': Provide one verbal cue or physical drill the user can use in their next set to fix this.
+   - 'THE GOOD': Highlight the strongest points of postural integrity.
+   - 'THE ERROR': Pinpoint 1 specific technical flaw using the JSON data coordinates.
+   - 'THE CUE': Provide one verbal cue or physical adjustment for immediate improvement.
 
-Provide a highly professional, clinical, and actionable report.
+Provide a highly professional and clinical report.
 """
                 json_data = json.dumps({"metadata": {"sport": sport, "action": sel_action}, "skeletal_frames": data['skeletal']}, indent=4)
                 zip_buffer = io.BytesIO()
@@ -203,7 +215,7 @@ Provide a highly professional, clinical, and actionable report.
                 
                 st.success("Analysis Pack Ready!")
                 st.download_button(
-                    label="📦 DOWNLOAD PRO PACK (VIDEO + JSON + AI PROMPT)",
+                    label="📦 DOWNLOAD PRO PACK",
                     data=zip_buffer.getvalue(),
                     file_name=f"{sport.lower().replace(' ', '_')}_analysis.zip",
                     mime="application/zip",
