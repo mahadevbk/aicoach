@@ -35,6 +35,7 @@ st.markdown("""
 # --- CONSTANTS ---
 POSE_CONNECTIONS = [(0, 1), (1, 2), (2, 3), (3, 7), (0, 4), (4, 5), (5, 6), (6, 8), (9, 10), (11, 12), (11, 13), (13, 15), (12, 14), (14, 16), (11, 23), (12, 24), (23, 24), (23, 25), (25, 27), (24, 26), (26, 28), (27, 29), (28, 30), (29, 31), (30, 32), (27, 31), (28, 32)]
 
+# ARRANGEMENT: Tennis, Padel, Pickleball, Golf, Badminton, Cricket Batting, Cricket Bowling, Gym
 SPORT_CONFIGS = {
     "TENNIS 🎾": {
         "Serve": "Analyze toss height, trophy position, and kinetic chain.",
@@ -63,17 +64,6 @@ SPORT_CONFIGS = {
         "Putting": "Pendulum motion and head stability.",
         "Practice Sequence": "Multi-shot consistency tracking."
     },
-    "GYM 🏋️": {
-        "Back Squat": "Analyze depth, knee tracking, and torso angle.",
-        "Deadlift": "Focus on lumbar neutrality, hip hinge, and bar path.",
-        "Bench Press": "Evaluate bar path consistency and elbow tuck.",
-        "Overhead Press": "Check for vertical path and core bracing.",
-        "Bicep Curl": "Analyze elbow drive and momentum usage.",
-        "Lateral Raise": "Evaluate shoulder abduction and trap compensation.",
-        "Push-Up": "Focus on scapular movement and plank stability.",
-        "Pull-Up": "Analyze pull-through and shoulder blade retraction.",
-        "Burpee": "Evaluate explosive transition and landing mechanics."
-    },
     "BADMINTON 🏸": {
         "Jump Smash": "Vertical leap and overhead whip speed.",
         "Net Drop": "Short-range touch and racket face angle.",
@@ -91,6 +81,17 @@ SPORT_CONFIGS = {
         "Spin Bowling": "Focus on pivot, shoulder rotation, and release point consistency.",
         "Delivery Stride": "Evaluate alignment of feet and torso at the crease.",
         "Over Analysis": "Full over analysis and run-up consistency tracking."
+    },
+    "GYM 🏋️": {
+        "Bodyweight Squat": "Analyze depth, heel contact, and torso uprightness.",
+        "Walking Lunges": "Check knee alignment (tracking over toes) and stride length.",
+        "Push-Ups": "Evaluate core bracing (no sagging hips) and elbow flare.",
+        "Back Squat (Weights)": "Analyze hip hinge, knee stability, and bar path.",
+        "Deadlift": "Focus on lumbar neutrality and lat engagement.",
+        "Bench Press": "Evaluate bar path and scapular retraction.",
+        "Pull-Ups/Chin-Ups": "Check for full dead-hang to chin-over-bar ROM.",
+        "Plank": "Analyze spine neutrality and shoulder stack.",
+        "Burpees": "Evaluate explosive transition and hip mobility."
     }
 }
 
@@ -130,7 +131,7 @@ def render_video(input_path, skeletal_data, stroke_label, info_dict, w, h, fps):
             for s, e in POSE_CONNECTIONS:
                 p1, p2 = (int(frame_data[s]['x']*w), int(frame_data[s]['y']*h)), (int(frame_data[e]['x']*w), int(frame_data[e]['y']*h))
                 cv2.line(canvas, p1, p2, (0, 255, 127), 4)
-        cv2.putText(canvas, f"DETECTION: {stroke_label}", (40, h + 80), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (255, 255, 255), 2)
+        cv2.putText(canvas, f"MOTION: {stroke_label}", (40, h + 80), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (255, 255, 255), 2)
         cv2.putText(canvas, f"GOAL: {instr}", (40, h + 140), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (200, 200, 200), 1)
         out.write(canvas); progress_bar.progress((i + 1) / len(skeletal_data))
     cap.release(); out.release(); progress_bar.empty()
@@ -171,20 +172,27 @@ for i, (sport, actions) in enumerate(SPORT_CONFIGS.items()):
             if analyze_btn:
                 processed_path = render_video(tfile.name, data['skeletal'], sel_action, actions, *data['dims'], data['fps'])
                 
-                # ENHANCED AI PROMPT
+                # HYPER-DETAILED AI PROMPT FOR MAXIMUM VALUE
                 detailed_prompt = f"""
-ACT AS A PROFESSIONAL { "STRENGTH COACH" if sport == "GYM 🏋️" else sport.upper() + " COACH" } AND BIOMECHANIST.
-TARGET: {sel_action}
-TECHNICAL FOCUS: {actions[sel_action]}
+ACT AS AN ELITE BIOMECHANIST AND PERFORMANCE COACH. 
+YOU ARE ANALYZING A {sport.upper()} SESSION, SPECIFICALLY THE {sel_action.upper()}.
 
-CONTEXT:
-Analyzing skeletal data from a MediaPipe 33-landmark mesh.
+MOVEMENT OBJECTIVE: {actions[sel_action]}
 
-INSTRUCTIONS:
-1. Examine joint angles and stability.
-2. Check for range of motion (ROM) and postural integrity.
-3. For {sport}, evaluate the specific movement cues required for {sel_action}.
-4. Provide feedback: 'The Good', 'The Flaw' (based on specific data points), and 'The Drill/Adjustment'.
+INPUT DATA:
+- Attached 'data.json' contains full 3D skeletal landmark coordinates (MediaPipe format) for the entire movement.
+- Attached 'analysis.mp4' shows the visual skeletal overlay.
+
+COACHING REQUIREMENTS:
+1. **Critical Form Evaluation**: Compare the user's joint trajectories against 'Gold Standard' biomechanics for {sel_action}.
+2. **Kinetic Chain Audit**: Identify if power is being generated correctly (e.g., from the floor up in a squat, or through the core in a tennis drive).
+3. **Safety Analysis**: Highlight any high-risk joint angles (e.g., knee valgus, lumbar rounding, or shoulder impingement risks).
+4. **Data-Driven Feedback**: 
+   - 'THE GOOD': What frame ranges show the strongest technical execution?
+   - 'THE ERROR': Pinpoint 1 specific biomechanical flaw using the JSON data (e.g., 'Hip height stays too high during the squat descent').
+   - 'THE CUE': Provide one verbal cue or physical drill the user can use in their next set to fix this.
+
+Provide a highly professional, clinical, and actionable report.
 """
                 json_data = json.dumps({"metadata": {"sport": sport, "action": sel_action}, "skeletal_frames": data['skeletal']}, indent=4)
                 zip_buffer = io.BytesIO()
@@ -193,11 +201,15 @@ INSTRUCTIONS:
                     zf.writestr("data.json", json_data)
                     zf.writestr("prompt.txt", detailed_prompt)
                 
-                st.success("Analysis Complete!")
-                st.download_button(label="📦 DOWNLOAD PRO PACK", data=zip_buffer.getvalue(), file_name=f"{sport.lower().replace(' ', '_')}_pack.zip", mime="application/zip", key=f"dl_{sport}")
+                st.success("Analysis Pack Ready!")
+                st.download_button(
+                    label="📦 DOWNLOAD PRO PACK (VIDEO + JSON + AI PROMPT)",
+                    data=zip_buffer.getvalue(),
+                    file_name=f"{sport.lower().replace(' ', '_')}_analysis.zip",
+                    mime="application/zip",
+                    key=f"dl_{sport}"
+                )
             st.markdown("</div>", unsafe_allow_html=True)
         st.markdown("</div>", unsafe_allow_html=True)
 
-# --- GLOBAL FOOTER ---
-st.markdown("<br>", unsafe_allow_html=True)
-st.info("🔒 **Privacy Note:** Your videos are processed locally in memory. No data, videos, or skeletal metrics are stored on our servers once the session is closed.")
+st.info("🔒 All analysis is performed locally. Your data is not stored on any server.")
