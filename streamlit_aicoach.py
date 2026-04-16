@@ -7,7 +7,6 @@ import mediapipe as mp
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
 import tempfile
-import time
 import zipfile
 import io
 
@@ -33,20 +32,18 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- CONSTANTS ---
-POSE_CONNECTIONS = [
-    (0, 1), (1, 2), (2, 3), (3, 7), (0, 4), (4, 5), (5, 6), (6, 8), (9, 10),
-    (11, 12), (11, 13), (13, 15), (12, 14), (14, 16), (11, 23), (12, 24),
-    (23, 24), (23, 25), (25, 27), (24, 26), (26, 28), (27, 29), (28, 30),
-    (29, 31), (30, 32), (27, 31), (28, 32)
-]
+# --- CONSTANTS & CONFIGS ---
+POSE_CONNECTIONS = [(0, 1), (1, 2), (2, 3), (3, 7), (0, 4), (4, 5), (5, 6), (6, 8), (9, 10), (11, 12), (11, 13), (13, 15), (12, 14), (14, 16), (11, 23), (12, 24), (23, 24), (23, 25), (25, 27), (24, 26), (26, 28), (27, 29), (28, 30), (29, 31), (30, 32), (27, 31), (28, 32)]
 
 SPORT_CONFIGS = {
     "TENNIS 🎾": {
-        "Serve": "Analyze toss alignment and extension.",
-        "Forehand/Backhand": "Focus on X-Factor and topspin path.",
-        "General Rally": "Full point analysis from serve to finish.",
-        "Volley": "Punch depth and stability."
+        "Serve": "Analyze toss height, trophy position, and kinetic chain.",
+        "Forehand Drive": "Focus on unit turn, X-Factor rotation, and topspin follow-through.",
+        "Backhand Drive": "Evaluate shoulder turn, weight transfer, and contact point out front.",
+        "Forehand Slice": "Analyze high-to-low path and core stability.",
+        "Backhand Slice": "Evaluate the knife-like motion and balanced finish.",
+        "General Rally": "Full court movement and stroke transition analysis.",
+        "Volley": "Punch depth and head stability at net."
     },
     "PADEL 🎾": {
         "Bandeja": "High-contact control and side-step timing.",
@@ -61,7 +58,7 @@ SPORT_CONFIGS = {
         "Third Shot Drop": "Arc height and landing depth."
     },
     "GOLF ⛳": {
-        "Driver Swing": "Wide arc and dynamic weight shift.",
+        "Driver Swing": "Wide arc, spine angle, and dynamic weight shift.",
         "Iron Swing": "Downward strike and lead arm extension.",
         "Putting": "Pendulum motion and head stability.",
         "Practice Sequence": "Multi-shot consistency tracking."
@@ -73,30 +70,28 @@ SPORT_CONFIGS = {
         "Clear": "Full-court depth and shoulder rotation."
     },
     "CRICKET BATTING 🏏": {
-        "Drive": "Check head position and high elbow lead.",
-        "Pull/Hook": "Analyze rotation and weight on back foot.",
-        "Defensive Shot": "Evaluate bat-pad gap and vertical bat angle.",
+        "Drive": "Check head position, high elbow lead, and front foot stride.",
+        "Pull/Hook": "Analyze rotation, back-foot weight transfer, and bat path.",
+        "Defensive Shot": "Evaluate bat-pad gap and vertical bat angle stability.",
         "Net Practice": "Continuous shot selection and posture analysis."
     },
     "CRICKET BOWLING ⚾": {
-        "Fast Bowling": "Analyze gather, front-foot landing, and release height.",
-        "Spin Bowling": "Focus on pivot, shoulder rotation, and release point.",
-        "Delivery Stride": "Evaluate alignment of feet and torso at crease.",
-        "Over Analysis": "Full over analysis and run-up consistency."
+        "Fast Bowling": "Analyze gather, front-foot landing, release height, and follow-through.",
+        "Spin Bowling": "Focus on pivot, shoulder rotation, and release point consistency.",
+        "Delivery Stride": "Evaluate alignment of feet and torso at the crease.",
+        "Over Analysis": "Full over analysis and run-up consistency tracking."
     }
 }
 
-# --- FUNCTIONS ---
+# --- CORE FUNCTIONS ---
 def extract_landmarks(video_path):
     detector = vision.PoseLandmarker.create_from_options(vision.PoseLandmarkerOptions(
         base_options=python.BaseOptions(model_asset_path='pose_landmarker_lite.task'),
         running_mode=vision.RunningMode.VIDEO
     ))
     cap = cv2.VideoCapture(video_path)
-    fps = cap.get(cv2.CAP_PROP_FPS)
-    w, h = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    skeletal_series, timestamp_ms = [], 0
+    fps, w, h = cap.get(cv2.CAP_PROP_FPS), int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    total_frames, skeletal_series, timestamp_ms = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)), [], 0
     progress_bar = st.progress(0, text="SCANNING BIOMETRICS...")
     for i in range(total_frames):
         ret, frame = cap.read()
@@ -107,42 +102,36 @@ def extract_landmarks(video_path):
         skeletal_series.append(lm)
         timestamp_ms += (1000 / (fps if fps > 0 else 30))
         progress_bar.progress((i + 1) / total_frames)
-    cap.release()
-    progress_bar.empty()
+    cap.release(); progress_bar.empty()
     return skeletal_series, fps, (w, h)
 
 def render_video(input_path, skeletal_data, stroke_label, info_dict, w, h, fps):
     cap = cv2.VideoCapture(input_path)
     temp_output = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4")
-    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-    out = cv2.VideoWriter(temp_output.name, fourcc, fps if fps > 0 else 30.0, (w, h + 200))
-    instr = info_dict.get(stroke_label, "Analyze alignment.")
-    progress_bar = st.progress(0, text="RENDERING BIOMECHANICS...")
+    out = cv2.VideoWriter(temp_output.name, cv2.VideoWriter_fourcc(*'mp4v'), fps if fps > 0 else 30.0, (w, h + 200))
+    instr = info_dict.get(stroke_label, "General Analysis")
+    progress_bar = st.progress(0, text="RENDERING OVERLAY...")
     for i, frame_data in enumerate(skeletal_data):
         ret, frame = cap.read()
         if not ret: break
-        canvas = np.zeros((h + 200, w, 3), dtype=np.uint8)
-        canvas[0:h, 0:w] = frame
+        canvas = np.zeros((h + 200, w, 3), dtype=np.uint8); canvas[0:h, 0:w] = frame
         if frame_data:
             for s, e in POSE_CONNECTIONS:
                 p1, p2 = (int(frame_data[s]['x']*w), int(frame_data[s]['y']*h)), (int(frame_data[e]['x']*w), int(frame_data[e]['y']*h))
                 cv2.line(canvas, p1, p2, (0, 255, 127), 4)
-        cv2.putText(canvas, f"DETECTION: {stroke_label}", (40, h + 80), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (255, 255, 255), 2)
+        cv2.putText(canvas, f"MOTION: {stroke_label}", (40, h + 80), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (255, 255, 255), 2)
         cv2.putText(canvas, f"GOAL: {instr}", (40, h + 140), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (200, 200, 200), 1)
-        out.write(canvas)
-        progress_bar.progress((i + 1) / len(skeletal_data))
+        out.write(canvas); progress_bar.progress((i + 1) / len(skeletal_data))
     cap.release(); out.release(); progress_bar.empty()
     return temp_output.name
 
-# --- APP LAYOUT ---
+# --- UI LOGIC ---
 st.markdown("<h1>NOT COACH NIKKI</h1>", unsafe_allow_html=True)
 st.markdown("<p class='hero-subtext'>Pro Sports Biomechanics</p>", unsafe_allow_html=True)
 
-tab_list = list(SPORT_CONFIGS.keys())
-tabs = st.tabs(tab_list)
+tabs = st.tabs(list(SPORT_CONFIGS.keys()))
 
-for i, sport in enumerate(tab_list):
-    actions = SPORT_CONFIGS[sport]
+for i, (sport, actions) in enumerate(SPORT_CONFIGS.items()):
     with tabs[i]:
         st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
         up_file = st.file_uploader(f"UPLOAD {sport} VIDEO", type=["mp4", "mov", "avi"], key=f"up_{sport}")
@@ -155,48 +144,53 @@ for i, sport in enumerate(tab_list):
             if state_key not in st.session_state or st.session_state.get(f"name_{sport}") != up_file.name:
                 with st.spinner("CALIBRATING SKELETAL MESH..."):
                     skeletal, fps, dims = extract_landmarks(tfile.name)
-                    st.session_state[state_key] = {"skeletal": skeletal, "fps": fps, "dims": dims, "processed": None}
+                    st.session_state[state_key] = {"skeletal": skeletal, "fps": fps, "dims": dims}
                     st.session_state[f"name_{sport}"] = up_file.name
 
             data = st.session_state[state_key]
             
             st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
             col1, col2 = st.columns([1, 1])
-            with col1:
-                sel_action = st.selectbox("SELECT ACTION", list(actions.keys()), key=f"sel_{sport}")
-            with col2:
-                analyze_btn = st.button("RUN PRO ANALYSIS", key=f"btn_{sport}")
+            with col1: sel_action = st.selectbox("SELECT ACTION", list(actions.keys()), key=f"sel_{sport}")
+            with col2: analyze_btn = st.button("RUN PRO ANALYSIS", key=f"btn_{sport}")
             
             if analyze_btn:
                 processed_path = render_video(tfile.name, data['skeletal'], sel_action, actions, *data['dims'], data['fps'])
                 
-                # --- DATA PACK GENERATION ---
-                json_data = json.dumps({
-                    "metadata": {"sport": sport, "action": sel_action, "info": actions[sel_action]},
-                    "skeletal_frames": data['skeletal']
-                }, indent=4)
+                # --- ENHANCED AI PROMPT ---
+                detailed_prompt = f"""
+ACT AS A PROFESSIONAL {sport.upper()} COACH AND BIOMECHANIST.
+ANALYSIS TARGET: {sel_action}
+TECHNICAL GOAL: {actions[sel_action]}
+
+CONTEXT:
+The user has provided a video of their performance. Attached is a 'data.json' containing 33 MediaPipe skeletal landmarks (x, y, z coordinates and visibility) for every single frame of the motion.
+
+INSTRUCTIONS:
+1. Examine the skeletal trajectory in the data. Look for flaws in the kinetic chain, balance issues, or improper joint alignment.
+2. For {sport}, specifically check:
+   - Kinetic Linkage: Is power being transferred from the ground up through the core to the { "bat" if "CRICKET" in sport else "racket/club" }?
+   - Balance: Is the center of gravity stable during the peak of the motion?
+   - Extension: Is there full extension at the contact/release point?
+3. Provide a 'Pro-Level' breakdown:
+   - 'The Good': What parts of the biomechanics are fundamentally sound?
+   - 'The Flaw': Identify 1-2 specific technical errors visible in the movement paths.
+   - 'The Drill': Suggest one high-value drill to fix the identified flaw.
+
+Provide the feedback in a supportive, high-performance coaching tone. Use the 'data.json' to justify your findings (e.g., "The drop in shoulder Y-coordinate at frame 45 indicates...").
+"""
                 
-                ai_prompt = f"USER: Analyzing {sport} {sel_action}. {actions[sel_action]} Provide professional biomechanical coaching feedback based on this motion data."
+                json_data = json.dumps({"metadata": {"sport": sport, "action": sel_action}, "skeletal_frames": data['skeletal']}, indent=4)
                 
                 zip_buffer = io.BytesIO()
                 with zipfile.ZipFile(zip_buffer, "w") as zf:
-                    with open(processed_path, "rb") as f:
-                        zf.writestr("analysis.mp4", f.read())
+                    with open(processed_path, "rb") as f: zf.writestr("analysis.mp4", f.read())
                     zf.writestr("data.json", json_data)
-                    zf.writestr("prompt.txt", ai_prompt)
+                    zf.writestr("prompt.txt", detailed_prompt)
                 
                 st.success("Analysis Complete!")
-                st.download_button(
-                    label="📦 DOWNLOAD PRO PACK",
-                    data=zip_buffer.getvalue(),
-                    file_name=f"{sport.lower().replace(' ', '_')}_pack.zip",
-                    mime="application/zip",
-                    key=f"dl_{sport}"
-                )
+                st.download_button(label="📦 DOWNLOAD PRO PACK", data=zip_buffer.getvalue(), file_name=f"{sport.lower().replace(' ', '_')}_pack.zip", mime="application/zip", key=f"dl_{sport}")
             st.markdown("</div>", unsafe_allow_html=True)
         st.markdown("</div>", unsafe_allow_html=True)
 
-# --- GLOBAL FOOTER ---
-st.markdown("<br>", unsafe_allow_html=True)
-st.info("🔒 **Privacy Note:** Your videos are processed locally in memory. No data, videos, or skeletal metrics are stored on our servers once the session is closed.")
-st.info("Built with ❤️ using [Streamlit](https://streamlit.io/) — free and open source. [Other Scripts by dev](https://devs-scripts.streamlit.app/)")
+st.info("🔒 Your videos are processed locally. No data is stored once the session is closed.")
