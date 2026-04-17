@@ -137,7 +137,8 @@ def get_sport_metrics(skeletal_frames, sport_type):
             m["Ankle Stability"] = calculate_angle(gp(25), gp(27), gp(31))
             
         metrics.append(m)
-    return pd.DataFrame(metrics).interpolate().fillna(method='bfill').fillna(0)
+    #return pd.DataFrame(metrics).interpolate().fillna(method='bfill').fillna(0)
+    return pd.DataFrame(metrics).interpolate().bfill().fillna(0)
 
 # --- CORE FUNCTIONS ---
 def extract_landmarks(video_path):
