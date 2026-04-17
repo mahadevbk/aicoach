@@ -217,7 +217,7 @@ for i, (sport, actions) in enumerate(SPORT_CONFIGS.items()):
                 with st.expander("VIEW FRAME-BY-FRAME DATA POINTS"):
                     st.write(df)
 
-)
+
 
                 # Download
                 zip_buffer = io.BytesIO()
