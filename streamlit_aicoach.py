@@ -188,29 +188,36 @@ for i, (sport, actions) in enumerate(SPORT_CONFIGS.items()):
             sel_action = st.selectbox("SELECT ACTION", list(actions.keys()), key=f"sel_{sport}")
             analyze_btn = st.button("RUN PRO ANALYSIS", key=f"btn_{sport}", use_container_width=True)
             
+            
+)
+
             if analyze_btn:
                 processed_path = render_video(tfile.name, data['skeletal'], sel_action, *data['dims'], data['fps'])
                 df = get_sport_metrics(data['skeletal'], sport)
                 
                 st.success("Analysis Complete!")
                 
-                # --- NEW "NON-EXCEL" TELEMETRY UI ---
+                # --- UPDATED TELEMETRY UI WITH ERROR HANDLING ---
                 st.markdown("### 📊 PRO TELEMETRY")
                 
-                # Key Performance Indicators (Metrics)
-                m_cols = st.columns(len(df.columns))
-                for idx, col_name in enumerate(df.columns):
-                    peak_val = df[col_name].max()
-                    avg_val = df[col_name].mean()
-                    m_cols[idx].metric(label=col_name, value=f"{peak_val:.1f}°", delta=f"Avg: {avg_val:.1f}°")
-                
-                # Charting section
-                st.markdown("<br>", unsafe_allow_html=True)
-                st.line_chart(df, height=300)
+                # Only create columns if we actually have data points
+                if not df.empty and len(df.columns) > 0:
+                    m_cols = st.columns(len(df.columns))
+                    for idx, col_name in enumerate(df.columns):
+                        peak_val = df[col_name].max()
+                        avg_val = df[col_name].mean()
+                        m_cols[idx].metric(label=col_name, value=f"{peak_val:.1f}°", delta=f"Avg: {avg_val:.1f}°")
+                    
+                    st.markdown("<br>", unsafe_allow_html=True)
+                    st.line_chart(df, height=300)
+                else:
+                    st.warning("No motion data captured. Please try a video with better lighting or visibility.")
                 
                 # Detailed Breakdown Data Points
                 with st.expander("VIEW FRAME-BY-FRAME DATA POINTS"):
                     st.write(df)
+
+)
 
                 # Download
                 zip_buffer = io.BytesIO()
