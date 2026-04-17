@@ -189,7 +189,7 @@ for i, (sport, actions) in enumerate(SPORT_CONFIGS.items()):
             analyze_btn = st.button("RUN PRO ANALYSIS", key=f"btn_{sport}", use_container_width=True)
             
             
-)
+
 
             if analyze_btn:
                 processed_path = render_video(tfile.name, data['skeletal'], sel_action, *data['dims'], data['fps'])
