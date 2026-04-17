@@ -9,7 +9,8 @@ from mediapipe.tasks.python import vision
 import tempfile
 import zipfile
 import io
-import pandas as pd 
+import pandas as pd
+import urllib.request
 
 # --- PAGE CONFIG ---
 st.set_page_config(
@@ -30,7 +31,6 @@ st.markdown("""
         font-family: 'Roboto Flex', sans-serif; 
     }
     
-    /* Custom Metric Card Styling */
     [data-testid="stMetricValue"] { font-size: 28px !important; color: #ccff00 !important; font-weight: 800; }
     [data-testid="stMetricLabel"] { font-size: 14px !important; color: #94a3b8 !important; text-transform: uppercase; letter-spacing: 1px; }
     
@@ -64,7 +64,7 @@ st.markdown("""
     }
 
     .stTabs [data-baseweb="tab-list"] { gap: 10px; display: flex; flex-wrap: wrap; justify-content: center; background-color: transparent !important; }
-    .stTabs [data-baseweb="tab"] { height: 55px; flex: 1 1 calc(50% - 10px); min-width: 140px; background: rgba(255, 255, 255, 0.05) !important; border-radius: 14px !important; border: 1px solid rgba(255, 255, 255, 0.1) !important; margin: 0px !important; transition: all 0.3s ease; }
+    .stTabs [data-baseweb="tab"] { height: 55px; flex: 1 1 calc(50% - 10px); min-width: 140px; background: rgba(255, 255, 255, 0.05) !important; border-radius: 14px !important; border: 1px solid rgba(255, 255, 255, 0.1) !important; margin: 0px !important; }
     .stTabs [aria-selected="true"] { background: rgba(204, 255, 0, 0.1) !important; border: 1px solid #ccff00 !important; }
     .stTabs [aria-selected="true"] p { color: #ccff00 !important; font-weight: 700 !important; }
     @media (min-width: 1024px) { .stTabs [data-baseweb="tab"] { flex: 0 1 180px; } }
@@ -86,6 +86,19 @@ SPORT_CONFIGS = {
     "YOGA 🧘": {"Mountain Pose": "Vertical alignment.", "Downward Dog": "Spine length.", "Tree Pose": "Balance stability.", "Warrior 2": "Hip opening.", "Crow Pose": "Center of gravity."}
 }
 
+# --- DYNAMIC MODEL LOADER ---
+def download_heavy_model():
+    """Bypasses GitHub 25MB limit by downloading model directly to Streamlit server."""
+    model_url = "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_heavy/float16/1/pose_landmarker_heavy.task"
+    model_path = "pose_landmarker_heavy.task"
+    
+    if not os.path.exists(model_path):
+        with st.status("🚀 INITIALIZING PRO-GRADE AI ENGINE...", expanded=True) as status:
+            st.write("Fetching Heavy Biometric Model (this happens once per session)...")
+            urllib.request.urlretrieve(model_url, model_path)
+            status.update(label="✅ ENGINE READY!", state="complete", expanded=False)
+    return model_path
+
 # --- BIOMECHANICAL ANALYTICS ENGINE ---
 def calculate_angle(a, b, c):
     a, b, c = np.array(a), np.array(b), np.array(c)
@@ -100,38 +113,37 @@ def get_sport_metrics(skeletal_frames, sport_type):
         if not frame: metrics.append({}); continue
         gp = lambda i: [frame[i]['x'], frame[i]['y']]
         
-        # Universal Movement Data
         m = {
-            "Spine Verticality": calculate_angle(gp(11), gp(23), [frame[23]['x'], 0]),
+            "Core Verticality": calculate_angle(gp(11), gp(23), [frame[23]['x'], 0]),
             "Knee Load": calculate_angle(gp(23), gp(25), gp(27))
         }
         
-        # Rotational Power (Tennis, Golf, Padel, Cricket)
         if any(s in sport_type for s in ["TENNIS", "PADEL", "GOLF", "CRICKET"]):
-            # X-Factor: Difference between shoulder and hip alignment
             m["Shoulder Rotation"] = calculate_angle(gp(11), gp(12), [1, frame[12]['y']])
-            m["Hip Rotation"] = calculate_angle(gp(23), gp(24), [1, frame[24]['y']])
-            m["Extension Angle"] = calculate_angle(gp(11), gp(13), gp(15))
-        
-        # Stability/Strength (Gym, Yoga)
+            m["Arm Extension"] = calculate_angle(gp(11), gp(13), gp(15))
         elif any(s in sport_type for s in ["GYM", "YOGA"]):
             m["Hip Hinge"] = calculate_angle(gp(11), gp(23), gp(25))
-            m["Ankle Flex"] = calculate_angle(gp(25), gp(27), gp(31))
-            m["Core Compression"] = frame[23]['y'] # Relative vertical hip position
+            m["Balance Delta"] = abs(frame[27]['x'] - frame[28]['x'])
             
         metrics.append(m)
     return pd.DataFrame(metrics).interpolate().bfill().fillna(0)
 
 # --- CORE FUNCTIONS ---
 def extract_landmarks(video_path):
+    # Call the dynamic downloader
+    model_path = download_heavy_model()
+    
     detector = vision.PoseLandmarker.create_from_options(vision.PoseLandmarkerOptions(
-        base_options=python.BaseOptions(model_asset_path='pose_landmarker_lite.task'),
+        base_options=python.BaseOptions(model_asset_path=model_path),
         running_mode=vision.RunningMode.VIDEO
     ))
+    
     cap = cv2.VideoCapture(video_path)
-    fps, w, h = cap.get(cv2.CAP_PROP_FPS), int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    fps = cap.get(cv2.CAP_PROP_FPS)
+    w, h = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     total_frames, skeletal_series, timestamp_ms = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)), [], 0
-    progress_bar = st.progress(0, text="SCANNING BIOMETRICS...")
+    
+    progress_bar = st.progress(0, text="SCANNING BIOMETRICS (HEAVY MODEL)...")
     for i in range(total_frames):
         ret, frame = cap.read()
         if not ret: break
@@ -170,7 +182,7 @@ tabs = st.tabs(list(SPORT_CONFIGS.keys()))
 for i, (sport, actions) in enumerate(SPORT_CONFIGS.items()):
     with tabs[i]:
         st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
-        st.info(f"PRO {sport} ENGINE: Optimized for {', '.join(actions.keys())}")
+        st.info(f"PRO {sport} ENGINE: Heavy Model Active")
         
         up_file = st.file_uploader(f"UPLOAD {sport} VIDEO", type=["mp4", "mov", "avi"], key=f"up_{sport}")
         
@@ -188,42 +200,27 @@ for i, (sport, actions) in enumerate(SPORT_CONFIGS.items()):
             sel_action = st.selectbox("SELECT ACTION", list(actions.keys()), key=f"sel_{sport}")
             analyze_btn = st.button("RUN PRO ANALYSIS", key=f"btn_{sport}", use_container_width=True)
             
-            
-
-
             if analyze_btn:
                 processed_path = render_video(tfile.name, data['skeletal'], sel_action, *data['dims'], data['fps'])
                 df = get_sport_metrics(data['skeletal'], sport)
                 
                 st.success("Analysis Complete!")
-                
-                # --- UPDATED TELEMETRY UI WITH ERROR HANDLING ---
                 st.markdown("### 📊 PRO TELEMETRY")
                 
-                # Only create columns if we actually have data points
-                if not df.empty and len(df.columns) > 0:
+                if not df.empty:
                     m_cols = st.columns(len(df.columns))
                     for idx, col_name in enumerate(df.columns):
-                        peak_val = df[col_name].max()
-                        avg_val = df[col_name].mean()
-                        m_cols[idx].metric(label=col_name, value=f"{peak_val:.1f}°", delta=f"Avg: {avg_val:.1f}°")
-                    
-                    st.markdown("<br>", unsafe_allow_html=True)
+                        m_cols[idx].metric(label=col_name, value=f"{df[col_name].max():.1f}°", delta=f"Avg: {df[col_name].mean():.1f}°")
                     st.line_chart(df, height=300)
-                else:
-                    st.warning("No motion data captured. Please try a video with better lighting or visibility.")
                 
-                # Detailed Breakdown Data Points
-                with st.expander("VIEW FRAME-BY-FRAME DATA POINTS"):
-                    st.write(df)
-
-
-
-                # Download
                 zip_buffer = io.BytesIO()
                 with zipfile.ZipFile(zip_buffer, "w") as zf:
                     with open(processed_path, "rb") as f: zf.writestr("analysis.mp4", f.read())
                     zf.writestr("telemetry.csv", df.to_csv())
+                    
+                    # PROMPT INJECTION
+                    detailed_prompt = f"ACT AS ELITE COACH. SPORT: {sport}. ACTION: {sel_action}. TECHNICAL GOAL: {actions[sel_action]}."
+                    zf.writestr("coach_prompt.txt", detailed_prompt)
                 
                 st.download_button("📦 DOWNLOAD PRO PACK", zip_buffer.getvalue(), f"{sport}_analysis.zip", use_container_width=True)
             st.markdown("</div>", unsafe_allow_html=True)
