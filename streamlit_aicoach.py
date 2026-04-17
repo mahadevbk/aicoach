@@ -9,6 +9,7 @@ from mediapipe.tasks.python import vision
 import tempfile
 import zipfile
 import io
+import pandas as pd  # Added for data visualization
 
 # --- PAGE CONFIG ---
 st.set_page_config(
@@ -18,7 +19,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# --- PREMIUM CSS STYLING (Mobile Grid Optimized) ---
+# --- PREMIUM CSS STYLING ---
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Roboto+Flex:wght@100..1000&display=swap');
@@ -46,7 +47,7 @@ st.markdown("""
         -webkit-text-fill-color: transparent; 
         text-align: center; 
         margin-bottom: 0px !important; 
-        filter: drop-shadow(2px 2px 0.5px rgba(204, 255, 0, 0.9)); /* DIFFUSED GRADIENT SHADOW */
+        filter: drop-shadow(2px 2px 0.5px rgba(204, 255, 0, 0.9));
     }
     
     .hero-subtext { 
@@ -58,7 +59,6 @@ st.markdown("""
         letter-spacing: 2px; 
     }
 
-    /* --- MOBILE 2-COLUMN GRID SYSTEM --- */
     .stTabs [data-baseweb="tab-list"] { 
         gap: 10px; 
         display: flex; 
@@ -69,33 +69,22 @@ st.markdown("""
     
     .stTabs [data-baseweb="tab"] { 
         height: 55px; 
-        /* This creates the 2-column layout on mobile (accounting for gap) */
         flex: 1 1 calc(50% - 10px); 
         min-width: 140px;
         background: rgba(255, 255, 255, 0.05) !important; 
         border-radius: 14px !important; 
         border: 1px solid rgba(255, 255, 255, 0.1) !important;
         margin: 0px !important;
-        transition: all 0.3s ease;
     }
 
     .stTabs [aria-selected="true"] {
         background: rgba(204, 255, 0, 0.1) !important;
         border: 1px solid #ccff00 !important;
-        box-shadow: 0px 0px 15px rgba(204, 255, 0, 0.2);
     }
 
-    .stTabs [aria-selected="true"] p { 
-        color: #ccff00 !important; 
-        font-weight: 700 !important;
-    }
+    .stTabs [aria-selected="true"] p { color: #ccff00 !important; font-weight: 700 !important; }
 
-    /* Desktop View: Keep them more compact */
-    @media (min-width: 1024px) {
-        .stTabs [data-baseweb="tab"] {
-            flex: 0 1 180px;
-        }
-    }
+    @media (min-width: 1024px) { .stTabs [data-baseweb="tab"] { flex: 0 1 180px; } }
     </style>
     """, unsafe_allow_html=True)
 
@@ -103,60 +92,52 @@ st.markdown("""
 POSE_CONNECTIONS = [(0, 1), (1, 2), (2, 3), (3, 7), (0, 4), (4, 5), (5, 6), (6, 8), (9, 10), (11, 12), (11, 13), (13, 15), (12, 14), (14, 16), (11, 23), (12, 24), (23, 24), (23, 25), (25, 27), (24, 26), (26, 28), (27, 29), (28, 30), (29, 31), (30, 32), (27, 31), (28, 32)]
 
 SPORT_CONFIGS = {
-    "TENNIS 🎾": {
-        "Serve": "Analyze toss height, trophy position, and kinetic chain.",
-        "Forehand Drive": "Focus on unit turn, X-Factor rotation, and topspin follow-through.",
-        "Backhand Drive": "Evaluate shoulder turn and contact point out front.",
-        "Forehand Slice": "Analyze high-to-low path.",
-        "Backhand Slice": "Evaluate the knife-like motion.",
-        "Volley": "Punch depth and head stability."
-    },
-    "PADEL 🎾": {
-        "Bandeja": "High-contact control and side-step timing.",
-        "Vibora": "Aggressive slice and core rotation.",
-        "General Rally": "Wall-play transitions.",
-        "Underhand Serve": "Waist-height contact."
-    },
-    "PICKLEBALL 🥒": {
-        "Dink": "Soft touch and minimal wrist hinge.",
-        "Kitchen Volley": "Hand speed and reset stability.",
-        "Third Shot Drop": "Arc height and landing depth."
-    },
-    "GOLF ⛳": {
-        "Driver Swing": "Wide arc, spine angle, and dynamic weight shift.",
-        "Iron Swing": "Downward strike and lead arm extension.",
-        "Putting": "Pendulum motion and head stability."
-    },
-    "BADMINTON 🏸": {
-        "Jump Smash": "Vertical leap and overhead whip speed.",
-        "Net Drop": "Short-range touch and racket face angle.",
-        "Clear": "Full-court depth."
-    },
-    "CRICKET BATTING 🏏": {
-        "Drive": "Check head position, high elbow lead, and front foot stride.",
-        "Pull/Hook": "Analyze rotation and back-foot weight transfer.",
-        "Defensive Shot": "Evaluate bat-pad gap and bat angle."
-    },
-    "CRICKET BOWLING ⚾": {
-        "Fast Bowling": "Analyze gather, release height, and follow-through.",
-        "Spin Bowling": "Focus on pivot and release point consistency.",
-        "Delivery Stride": "Evaluate alignment of feet and torso."
-    },
-    "GYM 🏋️": {
-        "Bodyweight Squat": "Analyze depth and heel contact.",
-        "Walking Lunges": "Check knee alignment and stride length.",
-        "Push-Ups": "Evaluate core bracing and elbow flare.",
-        "Deadlift": "Focus on lumbar neutrality and hip hinge.",
-        "Pull-Ups": "Analyze range of motion and scapular retraction."
-    },
-    "YOGA 🧘": {
-        "Mountain Pose (Tadasana)": "Analyze vertical alignment and weight distribution.",
-        "Downward Dog (Adho Mukha Svanasana)": "Focus on spine length and hip elevation.",
-        "Tree Pose (Vrikshasana)": "Evaluate unilateral balance stability.",
-        "Warrior 2 (Virabhadrasana II)": "Check hip opening and arm alignment.",
-        "Crow Pose (Bakasana)": "Focus on center of gravity and arm balance."
-    }
+    "TENNIS 🎾": {"Serve": "Toss height and kinetic chain.", "Forehand Drive": "Unit turn and X-Factor.", "Backhand Drive": "Shoulder turn.", "Forehand Slice": "High-to-low path.", "Backhand Slice": "Knife motion.", "Volley": "Head stability."},
+    "PADEL 🎾": {"Bandeja": "Contact control.", "Vibora": "Core rotation.", "General Rally": "Wall-play.", "Underhand Serve": "Waist height."},
+    "PICKLEBALL 🥒": {"Dink": "Soft touch.", "Kitchen Volley": "Hand speed.", "Third Shot Drop": "Arc height."},
+    "GOLF ⛳": {"Driver Swing": "Wide arc and weight shift.", "Iron Swing": "Lead arm extension.", "Putting": "Pendulum motion."},
+    "BADMINTON 🏸": {"Jump Smash": "Overhead whip.", "Net Drop": "Racket face angle.", "Clear": "Court depth."},
+    "CRICKET BATTING 🏏": {"Drive": "High elbow lead.", "Pull/Hook": "Weight transfer.", "Defensive Shot": "Bat-pad gap."},
+    "CRICKET BOWLING ⚾": {"Fast Bowling": "Release height.", "Spin Bowling": "Pivot consistency.", "Delivery Stride": "Alignment."},
+    "GYM 🏋️": {"Bodyweight Squat": "Depth.", "Walking Lunges": "Knee alignment.", "Push-Ups": "Elbow flare.", "Deadlift": "Hip hinge.", "Pull-Ups": "Scapular retraction."},
+    "YOGA 🧘": {"Mountain Pose": "Vertical alignment.", "Downward Dog": "Spine length.", "Tree Pose": "Balance stability.", "Warrior 2": "Hip opening.", "Crow Pose": "Center of gravity."}
 }
+
+# --- BIOMECHANICAL ANALYTICS ENGINE ---
+def calculate_angle(a, b, c):
+    """Computes the angle (degrees) between three points."""
+    a, b, c = np.array(a), np.array(b), np.array(c)
+    v1 = a - b
+    v2 = c - b
+    cosine_angle = np.dot(v1, v2) / (np.linalg.norm(v1) * np.linalg.norm(v2))
+    return np.degrees(np.arccos(np.clip(cosine_angle, -1.0, 1.0)))
+
+def get_sport_metrics(skeletal_frames, sport_type):
+    """Extracts relevant biometric data based on the sport."""
+    metrics = []
+    for frame in skeletal_frames:
+        if not frame:
+            metrics.append({})
+            continue
+        
+        # Helper to get x,y for a specific landmark index
+        gp = lambda i: [frame[i]['x'], frame[i]['y']]
+        
+        # Base metrics for all sports
+        m = {
+            "Trunk Tilt": calculate_angle(gp(11), gp(23), [frame[23]['x'], 0]), # Angle against vertical
+            "Knee Flexion": calculate_angle(gp(23), gp(25), gp(27))
+        }
+        
+        # Sport Specific Focus
+        if any(s in sport_type for s in ["TENNIS", "PADEL", "GOLF", "CRICKET"]):
+            m["Lead Arm Extension"] = calculate_angle(gp(11), gp(13), gp(15))
+        if "GYM" in sport_type or "YOGA" in sport_type:
+            m["Hip Hinge"] = calculate_angle(gp(11), gp(23), gp(25))
+            m["Ankle Stability"] = calculate_angle(gp(25), gp(27), gp(31))
+            
+        metrics.append(m)
+    return pd.DataFrame(metrics).interpolate().fillna(method='bfill').fillna(0)
 
 # --- CORE FUNCTIONS ---
 def extract_landmarks(video_path):
@@ -231,25 +212,26 @@ for i, (sport, actions) in enumerate(SPORT_CONFIGS.items()):
             if analyze_btn:
                 processed_path = render_video(tfile.name, data['skeletal'], sel_action, actions, *data['dims'], data['fps'])
                 
-                # HYPER-DETAILED AI PROMPT
-                detailed_prompt = f"""
-ACT AS AN ELITE PERFORMANCE COACH AND BIOMECHANIST. 
-SESSION: {sport.upper()} - {sel_action.upper()}
-TECHNICAL GOAL: {actions[sel_action]}
-
-Using the attached JSON skeletal coordinates, provide:
-1. THE GOOD: Identify foundational biomechanical strengths.
-2. THE ERROR: Pinpoint the exact joint or timing breakdown using the frame data.
-3. THE FIX: Provide one clinical cue or drill for immediate improvement.
-"""
                 json_data = json.dumps({"metadata": {"sport": sport, "action": sel_action}, "skeletal_frames": data['skeletal']}, indent=4)
                 zip_buffer = io.BytesIO()
                 with zipfile.ZipFile(zip_buffer, "w") as zf:
                     with open(processed_path, "rb") as f: zf.writestr("analysis.mp4", f.read())
                     zf.writestr("data.json", json_data)
-                    zf.writestr("prompt.txt", detailed_prompt)
                 
                 st.success("Analysis Complete!")
                 st.download_button(label="📦 DOWNLOAD PRO PACK", data=zip_buffer.getvalue(), file_name=f"{sport.lower().replace(' ', '_')}_pack.zip", use_container_width=True)
+                
+                # --- NEW DATA VISUALIZATION SECTION ---
+                st.divider()
+                st.subheader("📊 Performance Telemetry")
+                df = get_sport_metrics(data['skeletal'], sport)
+                
+                c1, c2 = st.columns([2, 1])
+                with c1:
+                    st.line_chart(df, height=300)
+                with c2:
+                    st.write("**Range of Motion (Deg)**")
+                    st.dataframe(df.describe().loc[['min', 'max', 'mean']], use_container_width=True)
+                
             st.markdown("</div>", unsafe_allow_html=True)
         st.markdown("</div>", unsafe_allow_html=True)
