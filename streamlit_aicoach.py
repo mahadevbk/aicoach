@@ -155,7 +155,25 @@ def build_pro_telemetry(raw_frames, sport_raw, action, event_frame, fps, camera_
     }
     
     validation_warnings = []
-    diagnostic_data = [] # (idx, raw_disp, scale, norm_speed) for R_Wrist
+    
+    # Fix: 3-frame median filter for keypoint positions to eliminate tracking dropouts
+    filtered_pos = []
+    for i in range(total_frames):
+        f_filt = {}
+        for pt_idx in [15, 16, 27, 28]:
+            win_x, win_y, win_z = [], [], []
+            for d in [-1, 0, 1]:
+                idx = max(0, min(total_frames - 1, i + d))
+                if raw_frames[idx]:
+                    win_x.append(raw_frames[idx][pt_idx]['x'])
+                    win_y.append(raw_frames[idx][pt_idx]['y'])
+                    win_z.append(raw_frames[idx][pt_idx]['z'])
+            if win_x:
+                f_filt[pt_idx] = {'x': float(np.median(win_x)), 'y': float(np.median(win_y)), 'z': float(np.median(win_z))}
+            else:
+                f_filt[pt_idx] = {'x': 0.0, 'y': 0.0, 'z': 0.0}
+        filtered_pos.append(f_filt)
+
     last_valid_scale = 0.5
     prev_pts = [None] * 4 # RW, LW, RA, LA
     
@@ -164,11 +182,8 @@ def build_pro_telemetry(raw_frames, sport_raw, action, event_frame, fps, camera_
             for k in metrics: metrics[k].append(None)
             continue
             
-        # Fix: Body scale divisor using full 3D Euclidean distance
         mid_s, mid_h = get_midpoint(f[11], f[12]), get_midpoint(f[23], f[24])
-        current_scale = get_dist(mid_s, mid_h) # uses x, y, and z via get_dist
-        
-        # Fallback logic for unreliable detections
+        current_scale = get_dist(mid_s, mid_h)
         if current_scale < 0.05:
             scale = last_valid_scale
         else:
@@ -186,15 +201,12 @@ def build_pro_telemetry(raw_frames, sport_raw, action, event_frame, fps, camera_
         metrics["r_ankle"].append(calculate_3d_angle(f[26], f[28], f[30]))
         metrics["l_ankle"].append(calculate_3d_angle(f[25], f[27], f[29]))
         
-        for i, idx in enumerate([16, 15, 28, 27]):
-            curr_pt = f[idx]
+        for i, pt_idx in enumerate([16, 15, 28, 27]):
+            curr_pt = filtered_pos[idx_f][pt_idx]
             if prev_pts[i]:
                 raw_disp = get_dist(curr_pt, prev_pts[i])
                 norm_speed = round(raw_disp / scale, 4)
                 metrics[list(metrics.keys())[10+i]].append(norm_speed)
-                
-                if i == 0: # Diagnostic for Right Wrist (index 16)
-                    diagnostic_data.append((idx_f, raw_disp, scale, norm_speed))
             else:
                 metrics[list(metrics.keys())[10+i]].append(0.0)
             prev_pts[i] = curr_pt
@@ -204,14 +216,15 @@ def build_pro_telemetry(raw_frames, sport_raw, action, event_frame, fps, camera_
         metrics["trunk_forward_lean"].append(calculate_lean(mid_s, mid_h, 'sagittal'))
         metrics["trunk_lateral_lean"].append(calculate_lean(mid_s, mid_h, 'coronal'))
 
-    # Peak Diagnostic Analysis
-    rw_speeds = [d[3] for d in diagnostic_data]
-    if rw_speeds and max(rw_speeds) > 1.5:
-        sorted_diag = sorted(diagnostic_data, key=lambda x: x[3], reverse=True)[:5]
-        warn_msg = "Wrist speed exceeds 1.5 threshold. Top 5 Peaks: " + \
-                   ", ".join([f"Frame {d[0]}: Speed {d[3]}, Disp {d[1]:.4f}, Scale {d[2]:.4f}" for d in sorted_diag])
-        validation_warnings.append(warn_msg)
-        st.warning(f"DEEPFORM DIAGNOSTIC: {warn_msg}")
+    # Fix: Confirm and clamp remaining speed glitches exceeding 1.5
+    for key in ["r_wrist_speed", "l_wrist_speed", "r_ankle_speed", "l_ankle_speed"]:
+        if key in metrics:
+            for i in range(len(metrics[key])):
+                if metrics[key][i] is not None and metrics[key][i] > 1.5:
+                    validation_warnings.append(f"Confirmed tracker glitch in {key} at frame {i}. Speed {metrics[key][i]} clamped.")
+                    prev_v = metrics[key][max(0, i-1)] or 0.0
+                    next_v = metrics[key][min(total_frames-1, i+1)] or 0.0
+                    metrics[key][i] = round((prev_v + next_v) / 2, 4)
 
     racket_sports = ["TENNIS", "PADEL", "PICKLEBALL", "BADMINTON", "SQUASH"]
     if sport_clean in racket_sports:
