@@ -14,7 +14,7 @@ import subprocess
 import time
 
 # --- 1. FULL PREMIUM UI ---
-st.set_page_config(page_title="Not Coach Nikki | Pro Analytics", page_icon="🎾", layout="wide", initial_sidebar_state="collapsed")
+st.set_page_config(page_title="Deepform | Pro Analytics", page_icon="🎾", layout="wide", initial_sidebar_state="collapsed")
 
 import plotly.graph_objects as go
 import plotly.express as px
@@ -471,7 +471,7 @@ def render_pro_stereo(p1, p2, h1, h2, f1, f2, fps):
     return final_p
 
 # --- 4. UI ---
-st.markdown("<h1>NOT COACH NIKKI</h1>", unsafe_allow_html=True)
+st.markdown("<h1>DEEPFORM</h1>", unsafe_allow_html=True)
 st.markdown("<p class='hero-sub'>Professional Biomechanics AI</p>", unsafe_allow_html=True)
 
 SPORT_CONFIG = {
