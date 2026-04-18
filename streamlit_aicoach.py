@@ -13,6 +13,14 @@ import urllib.request
 import subprocess
 import time
 
+class NumpyEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, np.integer): return int(obj)
+        if isinstance(obj, np.floating): return float(obj)
+        if isinstance(obj, np.ndarray): return obj.tolist()
+        if isinstance(obj, np.bool_): return bool(obj)
+        return super(NumpyEncoder, self).default(obj)
+
 # --- 1. FULL PREMIUM UI ---
 st.set_page_config(page_title="Deepform | Pro Analytics", page_icon="🎾", layout="wide", initial_sidebar_state="collapsed")
 
@@ -567,7 +575,7 @@ for i, (sport, actions) in enumerate(SPORT_CONFIG.items()):
                     z_buf = io.BytesIO()
                     with zipfile.ZipFile(z_buf, "w") as zf:
                         zf.write(final_v, "analysis.mp4")
-                        zf.writestr("telemetry_OPTIMIZED.json", json.dumps(tele_opt, indent=2))
-                        zf.writestr("telemetry_RAW_DETAILED.json", json.dumps(s['d1']['raw'], indent=2))
+                        zf.writestr("telemetry_OPTIMIZED.json", json.dumps(tele_opt, indent=2, cls=NumpyEncoder))
+                        zf.writestr("telemetry_RAW_DETAILED.json", json.dumps(s['d1']['raw'], indent=2, cls=NumpyEncoder))
                     st.download_button("📥 DOWNLOAD REPORT PACK", z_buf.getvalue(), f"{sport}_Report.zip", use_container_width=True)
         st.markdown("</div>", unsafe_allow_html=True)
