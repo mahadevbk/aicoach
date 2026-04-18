@@ -2,225 +2,122 @@ import streamlit as st
 import cv2
 import numpy as np
 import os
-import json
 import mediapipe as mp
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
 import tempfile
-import zipfile
-import io
-import pandas as pd
 import urllib.request
+import json
 
-# --- PAGE CONFIG ---
-st.set_page_config(
-    page_title="Not Coach Nikki | Pro Analytics",
-    page_icon="🎾",
-    layout="wide",
-    initial_sidebar_state="collapsed"
-)
+# --- CONFIG & STYLES ---
+st.set_page_config(page_title="Coach Nikki | Stereo Pro", layout="wide")
 
-# --- PREMIUM CSS STYLING ---
 st.markdown("""
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=Roboto+Flex:wght@100..1000&display=swap');
-    
-    .stApp { 
-        background: radial-gradient(circle at top right, #1e293b, #020617); 
-        color: #f8fafc; 
-        font-family: 'Roboto Flex', sans-serif; 
-    }
-    
-    [data-testid="stMetricValue"] { font-size: 28px !important; color: #ccff00 !important; font-weight: 800; }
-    [data-testid="stMetricLabel"] { font-size: 14px !important; color: #94a3b8 !important; text-transform: uppercase; letter-spacing: 1px; }
-    
-    .glass-card { 
-        background: rgba(255, 255, 255, 0.03); 
-        backdrop-filter: blur(12px); 
-        border: 1px solid rgba(255, 255, 255, 0.1); 
-        border-radius: 24px; 
-        padding: 1.5rem; 
-        margin-bottom: 2rem; 
-    }
-    
-    h1 { 
-        font-size: clamp(1.8rem, 7vw, 3.5rem) !important; 
-        font-weight: 800 !important; 
-        background: linear-gradient(to right, #38bdf8, #818cf8); 
-        -webkit-background-clip: text; 
-        -webkit-text-fill-color: transparent; 
-        text-align: center; 
-        margin-bottom: 0px !important; 
-        filter: drop-shadow(2px 2px 0.5px rgba(204, 255, 0, 0.9));
-    }
-    
-    .hero-subtext { 
-        text-align: center; 
-        color: #94a3b8; 
-        font-size: 0.75rem; 
-        margin-bottom: 2rem; 
-        text-transform: uppercase; 
-        letter-spacing: 2px; 
-    }
-
-    .stTabs [data-baseweb="tab-list"] { gap: 10px; display: flex; flex-wrap: wrap; justify-content: center; background-color: transparent !important; }
-    .stTabs [data-baseweb="tab"] { height: 55px; flex: 1 1 calc(50% - 10px); min-width: 140px; background: rgba(255, 255, 255, 0.05) !important; border-radius: 14px !important; border: 1px solid rgba(255, 255, 255, 0.1) !important; margin: 0px !important; }
-    .stTabs [aria-selected="true"] { background: rgba(204, 255, 0, 0.1) !important; border: 1px solid #ccff00 !important; }
-    .stTabs [aria-selected="true"] p { color: #ccff00 !important; font-weight: 700 !important; }
-    @media (min-width: 1024px) { .stTabs [data-baseweb="tab"] { flex: 0 1 180px; } }
+    .stApp { background: #020617; color: #f8fafc; }
+    .glass-card { background: rgba(255, 255, 255, 0.05); border-radius: 15px; padding: 20px; border: 1px solid rgba(255,255,255,0.1); }
+    .highlight { color: #ccff00; font-weight: bold; }
     </style>
-    """, unsafe_allow_html=True)
+""", unsafe_allow_html=True)
 
-# --- CONFIGURATIONS ---
-POSE_CONNECTIONS = [(0, 1), (1, 2), (2, 3), (3, 7), (0, 4), (4, 5), (5, 6), (6, 8), (9, 10), (11, 12), (11, 13), (13, 15), (12, 14), (14, 16), (11, 23), (12, 24), (23, 24), (23, 25), (25, 27), (24, 26), (26, 28), (27, 29), (28, 30), (29, 31), (30, 32), (27, 31), (28, 32)]
-
-SPORT_CONFIGS = {
-    "TENNIS 🎾": {"Serve": "Toss height and kinetic chain.", "Forehand Drive": "Unit turn and X-Factor.", "Backhand Drive": "Shoulder turn.", "Forehand Slice": "High-to-low path.", "Backhand Slice": "Knife motion.", "Volley": "Head stability."},
-    "PADEL 🎾": {"Bandeja": "Contact control.", "Vibora": "Core rotation.", "General Rally": "Wall-play.", "Underhand Serve": "Waist height."},
-    "PICKLEBALL 🥒": {"Dink": "Soft touch.", "Kitchen Volley": "Hand speed.", "Third Shot Drop": "Arc height."},
-    "GOLF ⛳": {"Driver Swing": "Wide arc and weight shift.", "Iron Swing": "Lead arm extension.", "Putting": "Pendulum motion."},
-    "BADMINTON 🏸": {"Jump Smash": "Overhead whip.", "Net Drop": "Racket face angle.", "Clear": "Court depth."},
-    "CRICKET BATTING 🏏": {"Drive": "High elbow lead.", "Pull/Hook": "Weight transfer.", "Defensive Shot": "Bat-pad gap."},
-    "CRICKET BOWLING ⚾": {"Fast Bowling": "Release height.", "Spin Bowling": "Pivot consistency.", "Delivery Stride": "Alignment."},
-    "GYM 🏋️": {"Bodyweight Squat": "Depth.", "Walking Lunges": "Knee alignment.", "Push-Ups": "Elbow flare.", "Deadlift": "Hip hinge.", "Pull-Ups": "Scapular retraction."},
-    "YOGA 🧘": {"Mountain Pose": "Vertical alignment.", "Downward Dog": "Spine length.", "Tree Pose": "Balance stability.", "Warrior 2": "Hip opening.", "Crow Pose": "Center of gravity."}
-}
-
-# --- DYNAMIC MODEL LOADER ---
-def download_heavy_model():
-    """Bypasses GitHub 25MB limit by downloading model directly to Streamlit server."""
-    model_url = "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_heavy/float16/1/pose_landmarker_heavy.task"
+# --- ENGINE ---
+def get_model():
     model_path = "pose_landmarker_heavy.task"
-    
     if not os.path.exists(model_path):
-        with st.status("🚀 INITIALIZING PRO-GRADE AI ENGINE...", expanded=True) as status:
-            st.write("Fetching Heavy Biometric Model (this happens once per session)...")
-            urllib.request.urlretrieve(model_url, model_path)
-            status.update(label="✅ ENGINE READY!", state="complete", expanded=False)
+        url = "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_heavy/float16/1/pose_landmarker_heavy.task"
+        with st.spinner("Downloading Pro AI Model..."):
+            urllib.request.urlretrieve(url, model_path)
     return model_path
 
-# --- BIOMECHANICAL ANALYTICS ENGINE ---
-def calculate_angle(a, b, c):
-    a, b, c = np.array(a), np.array(b), np.array(c)
-    v1, v2 = a - b, c - b
-    norm1, norm2 = np.linalg.norm(v1), np.linalg.norm(v2)
-    if norm1 == 0 or norm2 == 0: return 0
-    return np.degrees(np.arccos(np.clip(np.dot(v1, v2) / (norm1 * norm2), -1.0, 1.0)))
+class StereoEngine:
+    def __init__(self, model_path):
+        self.model_path = model_path
 
-def get_sport_metrics(skeletal_frames, sport_type):
-    metrics = []
-    for frame in skeletal_frames:
-        if not frame: metrics.append({}); continue
-        gp = lambda i: [frame[i]['x'], frame[i]['y']]
+    def analyze_impact(self, video_path):
+        cap = cv2.VideoCapture(video_path)
+        fps = cap.get(cv2.CAP_PROP_FPS)
+        total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
         
-        m = {
-            "Core Verticality": calculate_angle(gp(11), gp(23), [frame[23]['x'], 0]),
-            "Knee Load": calculate_angle(gp(23), gp(25), gp(27))
-        }
+        options = vision.PoseLandmarkerOptions(
+            base_options=python.BaseOptions(model_asset_path=self.model_path),
+            running_mode=vision.RunningMode.VIDEO)
         
-        if any(s in sport_type for s in ["TENNIS", "PADEL", "GOLF", "CRICKET"]):
-            m["Shoulder Rotation"] = calculate_angle(gp(11), gp(12), [1, frame[12]['y']])
-            m["Arm Extension"] = calculate_angle(gp(11), gp(13), gp(15))
-        elif any(s in sport_type for s in ["GYM", "YOGA"]):
-            m["Hip Hinge"] = calculate_angle(gp(11), gp(23), gp(25))
-            m["Balance Delta"] = abs(frame[27]['x'] - frame[28]['x'])
-            
-        metrics.append(m)
-    return pd.DataFrame(metrics).interpolate().bfill().fillna(0)
-
-# --- CORE FUNCTIONS ---
-def extract_landmarks(video_path):
-    # Call the dynamic downloader
-    model_path = download_heavy_model()
-    
-    detector = vision.PoseLandmarker.create_from_options(vision.PoseLandmarkerOptions(
-        base_options=python.BaseOptions(model_asset_path=model_path),
-        running_mode=vision.RunningMode.VIDEO
-    ))
-    
-    cap = cv2.VideoCapture(video_path)
-    fps = cap.get(cv2.CAP_PROP_FPS)
-    w, h = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    total_frames, skeletal_series, timestamp_ms = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)), [], 0
-    
-    progress_bar = st.progress(0, text="SCANNING BIOMETRICS (HEAVY MODEL)...")
-    for i in range(total_frames):
-        ret, frame = cap.read()
-        if not ret: break
-        mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
-        res = detector.detect_for_video(mp_image, int(timestamp_ms))
-        lm = [{"x": p.x, "y": p.y, "z": p.z, "v": p.visibility} for p in res.pose_landmarks[0]] if res.pose_landmarks else None
-        skeletal_series.append(lm)
-        timestamp_ms += (1000 / (fps if fps > 0 else 30))
-        progress_bar.progress((i + 1) / total_frames)
-    cap.release(); progress_bar.empty()
-    return skeletal_series, fps, (w, h)
-
-def render_video(input_path, skeletal_data, stroke_label, w, h, fps):
-    cap = cv2.VideoCapture(input_path)
-    temp_output = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4")
-    out = cv2.VideoWriter(temp_output.name, cv2.VideoWriter_fourcc(*'mp4v'), fps if fps > 0 else 30.0, (w, h + 200))
-    for i, frame_data in enumerate(skeletal_data):
-        ret, frame = cap.read()
-        if not ret: break
-        canvas = np.zeros((h + 200, w, 3), dtype=np.uint8); canvas[0:h, 0:w] = frame
-        if frame_data:
-            for s, e in POSE_CONNECTIONS:
-                p1, p2 = (int(frame_data[s]['x']*w), int(frame_data[s]['y']*h)), (int(frame_data[e]['x']*w), int(frame_data[e]['y']*h))
-                cv2.line(canvas, p1, p2, (0, 255, 127), 4)
-        cv2.putText(canvas, f"DETECTION: {stroke_label}", (40, h + 80), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 255, 255), 2)
-        out.write(canvas)
-    cap.release(); out.release()
-    return temp_output.name
+        impact_frame, peak_vel = 0, 0
+        prev_wrist = None
+        
+        with vision.PoseLandmarker.create_from_options(options) as detector:
+            for i in range(total_frames):
+                ret, frame = cap.read()
+                if not ret: break
+                
+                mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+                res = detector.detect_for_video(mp_image, int((i * 1000) / fps))
+                
+                if res.pose_world_landmarks:
+                    wrist = res.pose_world_landmarks[0][15] # Left wrist as proxy
+                    if prev_wrist:
+                        vel = np.linalg.norm(np.array([wrist.x, wrist.y, wrist.z]) - np.array([prev_wrist.x, prev_wrist.y, prev_wrist.z]))
+                        if vel > peak_vel:
+                            peak_vel, impact_frame = vel, i
+                    prev_wrist = wrist
+        cap.release()
+        return impact_frame, total_frames, fps
 
 # --- UI LOGIC ---
-st.markdown("<h1>NOT COACH NIKKI</h1>", unsafe_allow_html=True)
-st.markdown("<p class='hero-subtext'>Pro Sports Biomechanics</p>", unsafe_allow_html=True)
+st.title("🎾 AI COACH | <span class='highlight'>STEREO SYNC</span>", unsafe_allow_html=True)
 
-tabs = st.tabs(list(SPORT_CONFIGS.keys()))
+col1, col2 = st.columns(2)
+v1 = col1.file_uploader("Lead Angle (Video A)", type=["mp4", "mov"])
+v2 = col2.file_uploader("Side Angle (Video B)", type=["mp4", "mov"])
 
-for i, (sport, actions) in enumerate(SPORT_CONFIGS.items()):
-    with tabs[i]:
-        st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
-        st.info(f"PRO {sport} ENGINE: Heavy Model Active")
+if v1 and v2:
+    # Save to temp
+    t1 = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4")
+    t2 = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4")
+    t1.write(v1.read()); t2.write(v2.read())
+
+    # 1. RUN AI INITIAL SYNC
+    if 'offset' not in st.session_state:
+        if st.button("🚀 RUN AI IMPACT DETECTION"):
+            engine = StereoEngine(get_model())
+            impact1, total1, fps1 = engine.analyze_impact(t1.name)
+            impact2, total2, fps2 = engine.analyze_impact(t2.name)
+            st.session_state.sync_data = {'i1': impact1, 'i2': impact2, 't1': total1, 't2': total2, 'fps': fps1}
+            st.session_state.offset = impact1 - impact2
+            st.rerun()
+
+    # 2. FINE TUNING UI
+    if 'offset' in st.session_state:
+        st.markdown("---")
+        st.subheader("🛠️ FINE-TUNE IMPACT SYNC")
+        s = st.session_state.sync_data
         
-        up_file = st.file_uploader(f"UPLOAD {sport} VIDEO", type=["mp4", "mov", "avi"], key=f"up_{sport}")
+        # UI for manual adjustment
+        c1, c2, c3 = st.columns([1, 1, 2])
+        f1 = c1.slider("Video A Impact Frame", 0, s['t1'], s['i1'])
+        f2 = c2.slider("Video B Impact Frame", 0, s['t2'], s['i2'])
         
-        if up_file:
-            tfile = tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(up_file.name)[1])
-            tfile.write(up_file.read())
-            
-            state_key = f"data_{sport}"
-            if state_key not in st.session_state or st.session_state.get(f"name_{sport}") != up_file.name:
-                skeletal, fps, dims = extract_landmarks(tfile.name)
-                st.session_state[state_key] = {"skeletal": skeletal, "fps": fps, "dims": dims}
-                st.session_state[f"name_{sport}"] = up_file.name
+        # Display 20% Preview Window (Impact +/- 10%)
+        # Here we show the frames side-by-side as a "Sanity Check"
+        cap1 = cv2.VideoCapture(t1.name)
+        cap2 = cv2.VideoCapture(t2.name)
+        
+        cap1.set(cv2.CAP_PROP_POS_FRAMES, f1)
+        cap2.set(cv2.CAP_PROP_POS_FRAMES, f2)
+        
+        _, img1 = cap1.read()
+        _, img2 = cap2.read()
+        
+        if img1 is not None and img2 is not None:
+            preview = np.hstack((cv2.resize(img1, (640, 360)), cv2.resize(img2, (640, 360))))
+            st.image(preview, caption="Sync Check: Are the impacts aligned? Adjust sliders above.", use_container_width=True)
 
-            data = st.session_state[state_key]
-            sel_action = st.selectbox("SELECT ACTION", list(actions.keys()), key=f"sel_{sport}")
-            analyze_btn = st.button("RUN PRO ANALYSIS", key=f"btn_{sport}", use_container_width=True)
+        if st.button("✅ GENERATE FINAL PRODUCTION VIDEO"):
+            # This is where you'd call your pipeline_stereo.py render logic
+            # using (f1 - f2) as the final offset.
+            st.success(f"Rendering Video with Offset: {f1 - f2} frames...")
+            # [Rendering logic here...]
             
-            if analyze_btn:
-                processed_path = render_video(tfile.name, data['skeletal'], sel_action, *data['dims'], data['fps'])
-                df = get_sport_metrics(data['skeletal'], sport)
-                
-                st.success("Analysis Complete!")
-                st.markdown("### 📊 PRO TELEMETRY")
-                
-                if not df.empty:
-                    m_cols = st.columns(len(df.columns))
-                    for idx, col_name in enumerate(df.columns):
-                        m_cols[idx].metric(label=col_name, value=f"{df[col_name].max():.1f}°", delta=f"Avg: {df[col_name].mean():.1f}°")
-                    st.line_chart(df, height=300)
-                
-                zip_buffer = io.BytesIO()
-                with zipfile.ZipFile(zip_buffer, "w") as zf:
-                    with open(processed_path, "rb") as f: zf.writestr("analysis.mp4", f.read())
-                    zf.writestr("telemetry.csv", df.to_csv())
-                    
-                    # PROMPT INJECTION
-                    detailed_prompt = f"ACT AS ELITE COACH. SPORT: {sport}. ACTION: {sel_action}. TECHNICAL GOAL: {actions[sel_action]}."
-                    zf.writestr("coach_prompt.txt", detailed_prompt)
-                
-                st.download_button("📦 DOWNLOAD PRO PACK", zip_buffer.getvalue(), f"{sport}_analysis.zip", use_container_width=True)
-            st.markdown("</div>", unsafe_allow_html=True)
+            # Dummy JSON for example
+            analytics = {"impact_sync": {"a": f1, "b": f2, "offset": f1-f2}}
+            st.json(analytics)
