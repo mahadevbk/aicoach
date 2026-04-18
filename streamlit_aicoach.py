@@ -155,14 +155,26 @@ def build_pro_telemetry(raw_frames, sport_raw, action, event_frame, fps, camera_
     }
     
     validation_warnings = []
+    diagnostic_data = [] # (idx, raw_disp, scale, norm_speed) for R_Wrist
+    last_valid_scale = 0.5
     prev_pts = [None] * 4 # RW, LW, RA, LA
-    for f in raw_frames:
+    
+    for idx_f, f in enumerate(raw_frames):
         if not f:
             for k in metrics: metrics[k].append(None)
             continue
+            
+        # Fix: Body scale divisor using full 3D Euclidean distance
         mid_s, mid_h = get_midpoint(f[11], f[12]), get_midpoint(f[23], f[24])
-        # Fix 1: Body scale divisor from same frame
-        scale = max(0.01, get_dist(mid_s, mid_h))
+        current_scale = get_dist(mid_s, mid_h) # uses x, y, and z via get_dist
+        
+        # Fallback logic for unreliable detections
+        if current_scale < 0.05:
+            scale = last_valid_scale
+        else:
+            scale = current_scale
+            last_valid_scale = current_scale
+            
         metrics["r_elbow"].append(calculate_3d_angle(f[12], f[14], f[16]))
         metrics["l_elbow"].append(calculate_3d_angle(f[11], f[13], f[15]))
         metrics["r_knee"].append(calculate_3d_angle(f[24], f[26], f[28]))
@@ -175,22 +187,31 @@ def build_pro_telemetry(raw_frames, sport_raw, action, event_frame, fps, camera_
         metrics["l_ankle"].append(calculate_3d_angle(f[25], f[27], f[29]))
         
         for i, idx in enumerate([16, 15, 28, 27]):
-            curr = f[idx]
+            curr_pt = f[idx]
             if prev_pts[i]:
-                # Body-relative normalized speed
-                val = round(get_dist(curr, prev_pts[i]) / scale, 4)
-                metrics[list(metrics.keys())[10+i]].append(val)
-            else: metrics[list(metrics.keys())[10+i]].append(0.0)
-            prev_pts[i] = curr
+                raw_disp = get_dist(curr_pt, prev_pts[i])
+                norm_speed = round(raw_disp / scale, 4)
+                metrics[list(metrics.keys())[10+i]].append(norm_speed)
+                
+                if i == 0: # Diagnostic for Right Wrist (index 16)
+                    diagnostic_data.append((idx_f, raw_disp, scale, norm_speed))
+            else:
+                metrics[list(metrics.keys())[10+i]].append(0.0)
+            prev_pts[i] = curr_pt
         
         metrics["shoulder_z_diff"].append(round(f[12]['z'] - f[11]['z'], 3))
         metrics["hip_z_diff"].append(round(f[24]['z'] - f[23]['z'], 3))
         metrics["trunk_forward_lean"].append(calculate_lean(mid_s, mid_h, 'sagittal'))
         metrics["trunk_lateral_lean"].append(calculate_lean(mid_s, mid_h, 'coronal'))
 
-    # Fix 1 cont: Validation check for speed normalization
-    if max([v for v in metrics["r_wrist_speed"] if v is not None] + [0]) > 1.5:
-        validation_warnings.append("Wrist speed normalization check: values exceed 1.5. Body scale divisor may be unreliable.")
+    # Peak Diagnostic Analysis
+    rw_speeds = [d[3] for d in diagnostic_data]
+    if rw_speeds and max(rw_speeds) > 1.5:
+        sorted_diag = sorted(diagnostic_data, key=lambda x: x[3], reverse=True)[:5]
+        warn_msg = "Wrist speed exceeds 1.5 threshold. Top 5 Peaks: " + \
+                   ", ".join([f"Frame {d[0]}: Speed {d[3]}, Disp {d[1]:.4f}, Scale {d[2]:.4f}" for d in sorted_diag])
+        validation_warnings.append(warn_msg)
+        st.warning(f"DEEPFORM DIAGNOSTIC: {warn_msg}")
 
     racket_sports = ["TENNIS", "PADEL", "PICKLEBALL", "BADMINTON", "SQUASH"]
     if sport_clean in racket_sports:
