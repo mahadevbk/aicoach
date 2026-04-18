@@ -10,6 +10,8 @@ import tempfile
 import zipfile
 import io
 import urllib.request
+import subprocess  # Added for WhatsApp compatibility
+import time        # Added for file management
 
 # --- 1. FULL PREMIUM UI RESTORATION ---
 st.set_page_config(
@@ -67,9 +69,7 @@ def analyze_full_data(path, model):
         history.append(lms)
         
         if lms:
-            # Capture High-Density XYZ
             raw.append([{"id": j, "x": l.x, "y": l.y, "z": l.z} for j, l in enumerate(lms)])
-            # Impact Detection (Wrist)
             if res.pose_world_landmarks:
                 w = res.pose_world_landmarks[0][15]
                 if prev_w:
@@ -80,15 +80,20 @@ def analyze_full_data(path, model):
     cap.release()
     return {"history": history, "raw": raw, "fps": fps, "total": len(history), "impact": impact_f}
 
+# FIXED: Now Uses FFmpeg for WhatsApp (H.264 + YUV420p)
 def render_pro_stereo(p1, p2, h1, h2, f1, f2, fps):
     cap1, cap2 = cv2.VideoCapture(p1), cv2.VideoCapture(p2)
     off, target_h = f1 - f2, 720
     w1 = int(cap1.get(3) * (target_h / cap1.get(4)))
     w2 = int(cap2.get(3) * (target_h / cap2.get(4)))
     
-    t_file = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4")
-    # Web-optimized codec
-    out = cv2.VideoWriter(t_file.name, cv2.VideoWriter_fourcc(*'vp09'), fps, (w1+w2, target_h))
+    # Ensure total width is divisible by 2 for H.264
+    combined_width = (w1 + w2) // 2 * 2
+    
+    raw_path = os.path.join(tempfile.gettempdir(), f"raw_{int(time.time())}.mp4")
+    final_path = os.path.join(tempfile.gettempdir(), f"prod_{int(time.time())}.mp4")
+    
+    out = cv2.VideoWriter(raw_path, cv2.VideoWriter_fourcc(*'mp4v'), fps, (w1+w2, target_h))
 
     for i in range(len(h1)):
         ret1, f1_img = cap1.read()
@@ -99,7 +104,6 @@ def render_pro_stereo(p1, p2, h1, h2, f1, f2, fps):
             lm2 = h2[idx2]
         else: f2_img, lm2 = np.zeros((720, w2, 3), dtype=np.uint8), None
 
-        # Draw Full Skeletons (Head/Eyes/Limbs)
         for img, lms in [(f1_img, h1[i]), (f2_img, lm2)]:
             if lms:
                 for s, e in FULL_SKELETON:
@@ -107,10 +111,14 @@ def render_pro_stereo(p1, p2, h1, h2, f1, f2, fps):
                              (int(lms[e].x*img.shape[1]), int(lms[e].y*img.shape[0])), (127, 255, 0), 3)
 
         out.write(np.hstack((cv2.resize(f1_img, (w1, target_h)), cv2.resize(f2_img, (w2, target_h)))))
+    
     cap1.release(); cap2.release(); out.release()
-    return t_file.name
+    
+    # Convert for WhatsApp compatibility
+    subprocess.run(f'ffmpeg -y -i "{raw_path}" -c:v libx264 -pix_fmt yuv420p -preset ultrafast "{final_path}"', shell=True)
+    return final_path
 
-# --- 3. UI LAYOUT (RESTORING ALL TABS) ---
+# --- 3. UI LAYOUT ---
 st.markdown("<h1>NOT COACH NIKKI</h1>", unsafe_allow_html=True)
 st.markdown("<p class='hero-sub'>Professional Biomechanics AI</p>", unsafe_allow_html=True)
 
@@ -158,7 +166,6 @@ for i, (sport, actions) in enumerate(SPORT_MAP.items()):
             if is_stereo and res_key in st.session_state and st.session_state[res_key] is not None:
                 s = st.session_state[res_key]
                 st.markdown("### 🛠️ SYNC VERIFICATION")
-                
                 sl1 = st.slider("Lead Impact Frame", 0, s['d1']['total']-1, s['d1']['impact'], key=f"sl1_{sport}")
                 sl2 = st.slider("Side Impact Frame", 0, s['d2']['total']-1, s['d2']['impact'], key=f"sl2_{sport}")
                 
@@ -175,7 +182,7 @@ for i, (sport, actions) in enumerate(SPORT_MAP.items()):
                     st.success("Analysis Optimized. Finalizing Pack...")
                     st.video(final_v)
                     
-                    # PRO PACK WITH HIGH-DENSITY COORDINATES
+                    # PRO PACK EXPORT
                     telemetry = {
                         "sport": sport, "action": sel_act, "offset": int(sl1-sl2),
                         "lead_xyz": s['d1']['raw'], "side_xyz": s['d2']['raw']
