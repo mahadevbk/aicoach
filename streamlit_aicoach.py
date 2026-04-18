@@ -12,7 +12,7 @@ import io
 import urllib.request
 import subprocess
 
-# --- 1. YOUR ORIGINAL PREMIUM UI (LOCKED) ---
+# --- 1. THE PREMIUM UI (RESTORED & LOCKED) ---
 st.set_page_config(page_title="Not Coach Nikki | Pro Analytics", page_icon="🎾", layout="wide", initial_sidebar_state="collapsed")
 
 st.markdown("""
@@ -20,7 +20,7 @@ st.markdown("""
     @import url('https://fonts.googleapis.com/css2?family=Roboto+Flex:wght@100..1000&display=swap');
     .stApp { background: radial-gradient(circle at top right, #1e293b, #020617); color: #f8fafc; font-family: 'Roboto Flex', sans-serif; }
     
-    /* NEON SLIDERS & INTERFACE */
+    /* NEON MOBILE SLIDERS */
     div[data-testid="stSlider"] label p { color: #ccff00 !important; font-weight: 900 !important; font-size: 1.2rem !important; text-transform: uppercase; }
     div[data-testid="stThumbValue"] { color: #000 !important; background-color: #ccff00 !important; font-weight: 900 !important; }
     div[data-baseweb="slider"] > div { background: #ccff00 !important; }
@@ -36,19 +36,12 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- 2. THE ENGINE: SKELETAL & WHATSAPP ENCODING ---
-FULL_SKELETON = [(0,1), (1,2), (2,3), (3,7), (0,4), (4,5), (5,6), (6,8), (9,10), (11,12), (11,13), (13,15), (12,14), (14,16), (11,23), (12,24), (23,24), (23,25), (25,27), (24,26), (26,28)]
-
-def convert_to_whatsapp_format(input_path):
-    """Forces H.264 YUV420p for instant WhatsApp/Mobile compatibility."""
-    output_path = input_path.replace(".mp4", "_pro.mp4")
-    try:
-        # preset fast and crf 23 ensures good quality vs file size for messaging
-        cmd = f"ffmpeg -y -i {input_path} -c:v libx264 -pix_fmt yuv420p -preset fast -crf 23 {output_path}"
-        subprocess.run(cmd, shell=True, check=True, capture_output=True)
-        return output_path
-    except:
-        return input_path
+# --- 2. THE PRODUCTION ENGINE (SKELETAL & WHATSAPP) ---
+FULL_SKELETON = [
+    (0,1), (1,2), (2,3), (3,7), (0,4), (4,5), (5,6), (6,8), # Head & Face
+    (9,10), (11,12), (11,13), (13,15), (12,14), (14,16),   # Arms
+    (11,23), (12,24), (23,24), (23,25), (25,27), (24,26), (26,28) # Torso & Legs
+]
 
 def analyze_high_density(path, model):
     det = vision.PoseLandmarker.create_from_options(vision.PoseLandmarkerOptions(
@@ -60,15 +53,15 @@ def analyze_high_density(path, model):
     while cap.isOpened():
         ret, frame = cap.read()
         if not ret: break
-        ts = int((len(history) * 1000) / fps)
+        ts = int((len(history) * 1000) / (fps if fps > 0 else 30))
         res = det.detect_for_video(mp.Image(image_format=mp.ImageFormat.SRGB, data=cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)), ts)
         lms = res.pose_landmarks[0] if res.pose_landmarks else None
         history.append(lms)
         
         if lms:
-            # Full Dense Data Capture
+            # Full Dense Coordinate Dump for JSON
             raw.append([{"id": j, "x": l.x, "y": l.y, "z": l.z, "v": l.visibility} for j, l in enumerate(lms)])
-            # Impact Velocity
+            # Impact Velocity Tracker
             if res.pose_world_landmarks:
                 w = res.pose_world_landmarks[0][15]
                 if prev_w:
@@ -85,8 +78,8 @@ def render_pro_stereo(p1, p2, h1, h2, f1, f2, fps):
     w1 = int(cap1.get(3) * (target_h / cap1.get(4)))
     w2 = int(cap2.get(3) * (target_h / cap2.get(4)))
     
-    temp_raw = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4")
-    out = cv2.VideoWriter(temp_raw.name, cv2.VideoWriter_fourcc(*'mp4v'), fps, (w1+w2, target_h))
+    t_raw = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4")
+    out = cv2.VideoWriter(t_raw.name, cv2.VideoWriter_fourcc(*'mp4v'), fps, (w1+w2, target_h))
 
     for i in range(len(h1)):
         ret1, img1 = cap1.read()
@@ -97,7 +90,6 @@ def render_pro_stereo(p1, p2, h1, h2, f1, f2, fps):
             lm2 = h2[idx2]
         else: img2, lm2 = np.zeros((720, w2, 3), dtype=np.uint8), None
 
-        # Draw Skeletons with Head Tracking
         for img, lms in [(img1, h1[i]), (img2, lm2)]:
             if lms:
                 for s, e in FULL_SKELETON:
@@ -106,20 +98,21 @@ def render_pro_stereo(p1, p2, h1, h2, f1, f2, fps):
 
         out.write(np.hstack((cv2.resize(img1, (w1, target_h)), cv2.resize(img2, (w2, target_h)))))
     cap1.release(); cap2.release(); out.release()
-    return convert_to_whatsapp_format(temp_raw.name)
+    
+    # MOBILE ENCODING STEP (WhatsApp Compatibility)
+    t_final = t_raw.name.replace(".mp4", "_whatsapp.mp4")
+    subprocess.run(f"ffmpeg -y -i {t_raw.name} -c:v libx264 -pix_fmt yuv420p -preset fast -crf 23 {t_final}", shell=True, capture_output=True)
+    return t_final
 
-# --- 3. UI TABS (RESTORING ALL ORIGINAL SPORTS) ---
+# --- 3. UI LAYOUT ---
 st.markdown("<h1>NOT COACH NIKKI</h1>", unsafe_allow_html=True)
-st.markdown("<p class='hero-sub'>Professional Biomechanics AI Engine</p>", unsafe_allow_html=True)
+st.markdown("<p class='hero-sub'>Pro Stereographic Biomechanics</p>", unsafe_allow_html=True)
 
 SPORT_MAP = {
     "TENNIS 🎾": ["Serve", "Forehand", "Backhand"],
-    "PADEL 🎾": ["Bandeja", "Vibora", "Smash"],
-    "PICKLEBALL 🥒": ["Dink", "Kitchen Volley"],
-    "GOLF ⛳": ["Driver Swing", "Iron Swing"],
-    "CRICKET 🏏": ["Batting Drive", "Fast Bowling"],
-    "GYM 🏋️": ["Squat", "Deadlift", "Bench Press"],
-    "YOGA 🧘": ["Warrior Pose", "Balance Alignment"]
+    "PADEL 🎾": ["Bandeja", "Vibora"],
+    "GOLF ⛳": ["Driver", "Iron"],
+    "GYM 🏋️": ["Squat", "Deadlift"]
 }
 
 tabs = st.tabs(list(SPORT_MAP.keys()))
@@ -130,55 +123,62 @@ for i, sport in enumerate(SPORT_MAP.keys()):
         col1, col2 = st.columns([1, 2])
         
         with col1:
-            st.info(f"AI READY: {sport}")
-            u1 = st.file_uploader("Lead Angle (MP4/MOV)", type=["mp4","mov"], key=f"u1_{sport}")
-            u2 = st.file_uploader("Side Angle (MP4/MOV)", type=["mp4","mov"], key=f"u2_{sport}")
-            sel_act = st.selectbox("Action Type", SPORT_MAP[sport], key=f"act_{sport}")
-            run_btn = st.button("RUN PRO ANALYSIS", key=f"run_{sport}", use_container_width=True)
+            st.info(f"AI ENGINE: {sport}")
+            u1 = st.file_uploader("Lead Angle", type=["mp4","mov"], key=f"u1_{sport}")
+            u2 = st.file_uploader("Side Angle", type=["mp4","mov"], key=f"u2_{sport}")
+            sel_act = st.selectbox("Action", SPORT_MAP[sport], key=f"act_{sport}")
+            run_btn = st.button("RUN AI ANALYSIS", key=f"run_{sport}", use_container_width=True)
 
         with col2:
             res_key = f"sync_{sport}"
             if run_btn and u1 and u2:
-                # Pre-download check
-                model_p = 'pose_landmarker_heavy.task'
-                if not os.path.exists(model_p):
-                    urllib.request.urlretrieve("https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_heavy/float16/1/pose_landmarker_heavy.task", model_p)
+                # Model Download Logic
+                mp_p = 'pose_landmarker_heavy.task'
+                if not os.path.exists(mp_p):
+                    urllib.request.urlretrieve("https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_heavy/float16/1/pose_landmarker_heavy.task", mp_p)
                 
-                t1_p = os.path.join(tempfile.gettempdir(), f"l_{sport}.mp4")
-                t2_p = os.path.join(tempfile.gettempdir(), f"s_{sport}.mp4")
-                with open(t1_p, "wb") as f: f.write(u1.getbuffer())
-                with open(t2_p, "wb") as f: f.write(u2.getbuffer())
+                t1, t2 = tempfile.NamedTemporaryFile(delete=False), tempfile.NamedTemporaryFile(delete=False)
+                t1.write(u1.getbuffer()); t2.write(u2.getbuffer())
                 
-                with st.status("Extracting High-Density Coordinates...") as status:
-                    d1 = analyze_high_density(t1_p, model_p)
-                    d2 = analyze_high_density(t2_p, model_p)
-                    st.session_state[res_key] = {"d1": d1, "d2": d2, "p1": t1_p, "p2": t2_p}
+                with st.status("Analyzing High-Density Data...") as status:
+                    d1 = analyze_high_density(t1.name, mp_p)
+                    d2 = analyze_high_density(t2.name, mp_p)
+                    st.session_state[res_key] = {"d1": d1, "d2": d2, "p1": t1.name, "p2": t2.name}
 
+            # --- SYNC VERIFICATION PREVIEW (RESTORED) ---
             if res_key in st.session_state and st.session_state[res_key]:
                 s = st.session_state[res_key]
-                st.markdown("### 🛠️ SYNC & EXPORT")
+                st.markdown("### 🛠️ SYNC VERIFICATION")
+                
                 sl1 = st.slider("Lead Impact Frame", 0, s['d1']['total']-1, s['d1']['impact'], key=f"sl1_{sport}")
                 sl2 = st.slider("Side Impact Frame", 0, s['d2']['total']-1, s['d2']['impact'], key=f"sl2_{sport}")
                 
-                if st.button("🎬 GENERATE PRODUCTION PACK", key=f"gen_{sport}", use_container_width=True):
-                    with st.spinner("Stitching & Encoding for WhatsApp..."):
+                # Live Preview Logic
+                cap1, cap2 = cv2.VideoCapture(s['p1']), cv2.VideoCapture(s['p2'])
+                cap1.set(1, sl1); cap2.set(1, sl2)
+                _, i1 = cap1.read(); _, i2 = cap2.read()
+                cap1.release(); cap2.release()
+                
+                if i1 is not None and i2 is not None:
+                    st.image(np.hstack((cv2.resize(cv2.cvtColor(i1, 4), (640, 480)), 
+                                        cv2.resize(cv2.cvtColor(i2, 4), (640, 480)))))
+                
+                if st.button("🎬 GENERATE WHATSAPP-READY PACK", key=f"gen_{sport}", use_container_width=True):
+                    with st.spinner("Stitching and Encoding for Mobile..."):
                         final_v = render_pro_stereo(s['p1'], s['p2'], s['d1']['history'], s['d2']['history'], sl1, sl2, s['d1']['fps'])
+                        st.success("Analysis Complete!")
+                        st.video(final_v) # WhatsApp-ready preview
                         
-                        st.success("Analysis Complete. Preview Enabled:")
-                        st.video(final_v) # This will now play in-browser and on mobile
-                        
-                        # Pack high-density telemetry
                         telemetry = {
-                            "metadata": {"sport": sport, "action": sel_act, "frame_offset": int(sl1-sl2)},
-                            "lead_data": s['d1']['raw'],
-                            "side_data": s['d2']['raw']
+                            "metadata": {"sport": sport, "sync_offset": int(sl1-sl2)},
+                            "lead_raw": s['d1']['raw'], "side_raw": s['d2']['raw']
                         }
                         
-                        z_buf = io.BytesIO()
-                        with zipfile.ZipFile(z_buf, "w") as zf:
-                            zf.write(final_v, "whatsapp_analysis.mp4")
-                            zf.writestr("dense_telemetry.json", json.dumps(telemetry))
-                            zf.writestr("coach_brief.txt", f"PRO BRIEF: {sport} {sel_act}. Target: Sync Offset {sl1-sl2}.")
+                        zip_io = io.BytesIO()
+                        with zipfile.ZipFile(zip_io, "w") as zf:
+                            zf.write(final_v, "full_biometric_analysis.mp4")
+                            zf.writestr("telemetry_full_xyz.json", json.dumps(telemetry))
+                            zf.writestr("brief.txt", f"AI COACH: {sport} {sel_act}. Frames Offset: {sl1-sl2}")
                         
-                        st.download_button("📥 DOWNLOAD MOBILE PACK", z_buf.getvalue(), f"{sport}_mobile_pack.zip", use_container_width=True)
+                        st.download_button("📥 DOWNLOAD MOBILE PACK", zip_io.getvalue(), f"{sport}_mobile_pack.zip", use_container_width=True)
         st.markdown("</div>", unsafe_allow_html=True)
