@@ -96,7 +96,155 @@ def calculate_3d_angle(p1, p2, p3):
     a, b, c = np.array([p1['x'], p1['y'], p1['z']]), np.array([p2['x'], p2['y'], p2['z']]), np.array([p3['x'], p3['y'], p3['z']])
     ba, bc = a - b, c - b
     cosine_angle = np.dot(ba, bc) / (np.linalg.norm(ba) * np.linalg.norm(bc) + 1e-6)
-    return round(float(np.degrees(np.arccos(np.clip(cosine_angle, -1.0, 1.0)))), 2)
+    return round(float(np.degrees(np.arccos(np.clip(cosine_angle, -1.0, 1.0)))), 1)
+
+def get_dist(p1, p2):
+    return np.linalg.norm(np.array([p1['x'], p1['y'], p1['z']]) - np.array([p2['x'], p2['y'], p2['z']]))
+
+def get_midpoint(p1, p2):
+    return {'x': (p1['x']+p2['x'])/2, 'y': (p1['y']+p2['y'])/2, 'z': (p1['z']+p2['z'])/2}
+
+def calculate_lean(p1, p2, plane='sagittal'):
+    v = np.array([p2['x']-p1['x'], p2['y']-p1['y'], p2['z']-p1['z']])
+    if plane == 'sagittal': # Y-Z plane
+        angle = np.degrees(np.arctan2(v[2], v[1]))
+    else: # Coronal: X-Y plane
+        angle = np.degrees(np.arctan2(v[0], v[1]))
+    return round(float(angle), 1)
+
+def interpolate_landmarks(raw_frames):
+    total = len(raw_frames)
+    if total == 0: return []
+    frames = [f.copy() if f else None for f in raw_frames]
+    for j in range(33):
+        missing = [i for i in range(total) if not frames[i] or frames[i][j] is None]
+        if not missing or len(missing) == total: continue
+        for m_idx in missing:
+            prev_idx = next((i for i in range(m_idx-1, -1, -1) if frames[i] and frames[i][j]), None)
+            next_idx = next((i for i in range(m_idx+1, total) if frames[i] and frames[i][j]), None)
+            if prev_idx is not None and next_idx is not None:
+                p, n = frames[prev_idx][j], frames[next_idx][j]
+                t = (m_idx - prev_idx) / (next_idx - prev_idx)
+                val = {'x': p['x'] + t*(n['x']-p['x']), 'y': p['y'] + t*(n['y']-p['y']), 'z': p['z'] + t*(n['z']-p['z'])}
+            elif prev_idx is not None: val = frames[prev_idx][j]
+            elif next_idx is not None: val = frames[next_idx][j]
+            else: val = {'x': 0.0, 'y': 0.0, 'z': 0.0}
+            if not frames[m_idx]: frames[m_idx] = [{'x':0.0, 'y':0.0, 'z':0.0} for _ in range(33)]
+            frames[m_idx][j] = val
+    return frames
+
+def build_pro_telemetry(raw_frames, sport_raw, action, event_frame, fps, camera_mode):
+    total_frames = len(raw_frames)
+    sport_clean = "".join([c for c in sport_raw if ord(c) < 128]).strip().upper()
+    event_frame = max(0, min(event_frame, total_frames - 1))
+    offset = int(event_frame - total_frames)
+    
+    metrics = {
+        "r_elbow": [], "l_elbow": [], "r_knee": [], "l_knee": [], "r_hip": [], "l_hip": [],
+        "r_shoulder_abduction": [], "l_shoulder_abduction": [], "r_ankle": [], "l_ankle": [],
+        "r_wrist_speed": [], "l_wrist_speed": [], "r_ankle_speed": [], "l_ankle_speed": [],
+        "shoulder_z_diff": [], "hip_z_diff": [], "trunk_forward_lean": [], "trunk_lateral_lean": []
+    }
+    
+    last_scale = 0.5
+    prev_pts = [None] * 4 # RW, LW, RA, LA
+    for f in raw_frames:
+        if not f:
+            for k in metrics: metrics[k].append(None)
+            continue
+        mid_s, mid_h = get_midpoint(f[11], f[12]), get_midpoint(f[23], f[24])
+        scale = max(0.01, get_dist(mid_s, mid_h))
+        metrics["r_elbow"].append(calculate_3d_angle(f[12], f[14], f[16]))
+        metrics["l_elbow"].append(calculate_3d_angle(f[11], f[13], f[15]))
+        metrics["r_knee"].append(calculate_3d_angle(f[24], f[26], f[28]))
+        metrics["l_knee"].append(calculate_3d_angle(f[23], f[25], f[27]))
+        metrics["r_hip"].append(calculate_3d_angle(f[12], f[24], f[26]))
+        metrics["l_hip"].append(calculate_3d_angle(f[11], f[23], f[25]))
+        metrics["r_shoulder_abduction"].append(calculate_3d_angle(f[14], f[12], f[24]))
+        metrics["l_shoulder_abduction"].append(calculate_3d_angle(f[13], f[11], f[23]))
+        metrics["r_ankle"].append(calculate_3d_angle(f[26], f[28], f[30]))
+        metrics["l_ankle"].append(calculate_3d_angle(f[25], f[27], f[29]))
+        
+        for i, idx in enumerate([16, 15, 28, 27]):
+            curr = f[idx]
+            if prev_pts[i]:
+                metrics[list(metrics.keys())[10+i]].append(round(get_dist(curr, prev_pts[i]) / scale, 4))
+            else: metrics[list(metrics.keys())[10+i]].append(0.0)
+            prev_pts[i] = curr
+        
+        metrics["shoulder_z_diff"].append(round(f[12]['z'] - f[11]['z'], 3))
+        metrics["hip_z_diff"].append(round(f[24]['z'] - f[23]['z'], 3))
+        metrics["trunk_forward_lean"].append(calculate_lean(mid_s, mid_h, 'sagittal'))
+        metrics["trunk_lateral_lean"].append(calculate_lean(mid_s, mid_h, 'coronal'))
+
+    racket_sports = ["TENNIS", "PADEL", "PICKLEBALL", "BADMINTON", "SQUASH"]
+    if sport_clean in racket_sports:
+        for k in ["r_ankle", "l_ankle", "r_ankle_speed", "l_ankle_speed"]: del metrics[k]
+
+    def get_snapshot(idx):
+        idx = max(0, min(idx, total_frames - 1))
+        f = raw_frames[idx]
+        if not f: return {}
+        mid_s, mid_h = get_midpoint(f[11], f[12]), get_midpoint(f[23], f[24])
+        return {
+            "r_elbow_angle": calculate_3d_angle(f[12], f[14], f[16]), "l_elbow_angle": calculate_3d_angle(f[11], f[13], f[15]),
+            "r_knee_angle": calculate_3d_angle(f[24], f[26], f[28]), "l_knee_angle": calculate_3d_angle(f[23], f[25], f[27]),
+            "r_hip_angle": calculate_3d_angle(f[12], f[24], f[26]), "l_hip_angle": calculate_3d_angle(f[11], f[23], f[25]),
+            "shoulder_tilt_deg": round(np.degrees(np.arctan2(f[12]['y'] - f[11]['y'], f[12]['x'] - f[11]['x'])), 1),
+            "trunk_forward_lean": calculate_lean(mid_s, mid_h, 'sagittal'), "trunk_lateral_lean": calculate_lean(mid_s, mid_h, 'coronal'),
+            "shoulder_z_diff": round(f[12]['z'] - f[11]['z'], 3), "hip_z_diff": round(f[24]['z'] - f[23]['z'], 3),
+            "hip_shoulder_separation": round((f[12]['z'] - f[11]['z']) - (f[24]['z'] - f[23]['z']), 3),
+            "r_wrist_above_r_shoulder": f[16]['y'] < f[12]['y'], "l_wrist_above_l_shoulder": f[15]['y'] < f[11]['y'],
+            "feet_grounded": f[28]['y'] > 0.80 and f[27]['y'] > 0.80, "stance_width_ratio": round(get_dist(f[27], f[28]) / (get_dist(f[23], f[24]) + 1e-6), 4)
+        }
+
+    output = {
+        "sport": sport_clean, "action": action, "camera": camera_mode,
+        "metadata": {
+            "fps": fps, "total_frames": total_frames, "offset": offset,
+            "dominant_side": "right" if np.max([s for s in metrics["r_wrist_speed"] if s is not None]) > np.max([s for s in metrics["l_wrist_speed"] if s is not None]) else "left",
+            "coordinate_system": {"y_axis": "increases_downward", "z_axis": "depth_into_camera", "normalisation": "mediapipe_image_fraction_0_to_1"}
+        },
+        "metrics": {k: [v for v in metrics[k] if v is not None] for k in metrics if any(v is not None for v in metrics[k])},
+        "event_snapshot": get_snapshot(event_frame), "phase_snapshots": {}, "speed_analysis": {}, "rotation_analysis": {}, "balance_stability": {}
+    }
+    output["event_snapshot"]["keypoints"] = [{"id": j, "x": round(raw_frames[event_frame][j]['x'], 4), "y": round(raw_frames[event_frame][j]['y'], 4), "z": round(raw_frames[event_frame][j]['z'], 4)} for j in [0,11,12,13,14,15,16,23,24,25,26,27,28,29,30] if raw_frames[event_frame]]
+
+    phases = []
+    if sport_clean in racket_sports: phases = [("trophy", -40), ("swing_start", -15), ("follow_through", 20)]
+    elif sport_clean == "GOLF": phases = [("address", -80), ("top", -30), ("downswing", -12), ("follow", 25)]
+    elif sport_clean == "GYM": phases = [("start", -45), ("midpoint", -22), ("finish", 30)]
+    elif sport_clean == "YOGA": phases = [("approach", -30), ("exit", 30)]
+    for name, p_off in phases: output["phase_snapshots"][name] = get_snapshot(event_frame + p_off)
+
+    def analyze_speed(speed_series):
+        clean_s = [s if s is not None else 0 for s in speed_series]
+        peak_idx = np.argmax(clean_s)
+        series_around = [{"offset": o, "speed": round(clean_s[max(0, min(total_frames-1, event_frame+o))], 4)} for o in range(-45, 11) if o == 0 or abs(o) <= 3 or o % 5 == 0]
+        decel = 0
+        for i in range(event_frame-1, 0, -1):
+            if i+1 < total_frames and clean_s[i] > clean_s[i+1]: decel += 1
+            else: break
+        return {"peak_speed": round(float(np.max(clean_s)), 4), "peak_frame_offset": int(peak_idx - event_frame), "speed_at_event": round(clean_s[event_frame], 4), "frames_decelerating_before_event": decel, "speed_series_around_event": series_around}
+
+    output["speed_analysis"]["r_wrist"] = analyze_speed(metrics["r_wrist_speed"])
+    output["speed_analysis"]["l_wrist"] = analyze_speed(metrics["l_wrist_speed"])
+
+    shoulder_p = np.argmax([abs(s) if s is not None else 0 for s in metrics["shoulder_z_diff"]])
+    hip_p = np.argmax([abs(h) if h is not None else 0 for h in metrics["hip_z_diff"]])
+    output["rotation_analysis"] = {
+        "hip_leads_shoulder": hip_p < shoulder_p, "hip_peak_offset": int(hip_p - event_frame), "shoulder_peak_offset": int(shoulder_p - event_frame),
+        "rotation_series": [{"offset": o, "hip_z": metrics["hip_z_diff"][max(0, min(total_frames-1, event_frame+o))], "shoulder_z": metrics["shoulder_z_diff"][max(0, min(total_frames-1, event_frame+o))]} for o in range(-45, 11, 5)]
+    }
+    if sport_clean == "GOLF": output["rotation_analysis"]["x_factor_at_top"] = round(metrics["hip_z_diff"][max(0, min(total_frames-1, event_frame-30))] - metrics["shoulder_z_diff"][max(0, min(total_frames-1, event_frame-30))], 3)
+
+    win = [f[0]['x'] for f in raw_frames[max(0, event_frame-5):min(total_frames, event_frame+5)] if f]
+    win_y = [f[0]['y'] for f in raw_frames[max(0, event_frame-5):min(total_frames, event_frame+5)] if f]
+    output["balance_stability"] = {
+        "nose_x_variance": round(float(np.var(win)), 4) if win else 0, "nose_y_variance": round(float(np.var(win_y)), 4) if win_y else 0,
+        "head_drift_before_event": "stable", "feet_grounded_at_event": output["event_snapshot"].get("feet_grounded", False), "heel_rise_detected": False
+    }
+    return output
 
 def get_ai_metrics(raw_frames, fps):
     if not raw_frames: return None
@@ -409,17 +557,17 @@ for i, (sport, actions) in enumerate(SPORT_CONFIG.items()):
                     final_v = render_pro_stereo(s['p1'], s['p2'], s['d1']['history'], (s['d2']['history'] if s['d2'] else []), sl1, sl2, s['d1']['fps'])
                     st.video(final_v)
                     
-                    tele_opt = {
-                        "sport": sport, "action": sel_act,
-                        "metadata": {"fps": s['d1']['fps'], "impact_frame": sl1, "offset": int(sl1-sl2) if s['d2'] else 0},
-                        "metrics": metrics,
-                        "impact_coords": [s['d1']['raw'][sl1][j] for j in OPTIMIZED_INDICES if s['d1']['raw'][sl1]]
-                    }
+                    # New Pro Telemetry Generation
+                    raw_interp = interpolate_landmarks(s['d1']['raw'])
+                    tele_opt = build_pro_telemetry(
+                        raw_interp, sport, sel_act, sl1, 
+                        s['d1']['fps'], "dual" if s['p2'] else "lead"
+                    )
                     
                     z_buf = io.BytesIO()
                     with zipfile.ZipFile(z_buf, "w") as zf:
                         zf.write(final_v, "analysis.mp4")
-                        zf.writestr("telemetry_OPTIMIZED.json", json.dumps(tele_opt))
-                        zf.writestr("telemetry_RAW_DETAILED.json", json.dumps(s['d1']['raw']))
+                        zf.writestr("telemetry_OPTIMIZED.json", json.dumps(tele_opt, indent=2))
+                        zf.writestr("telemetry_RAW_DETAILED.json", json.dumps(s['d1']['raw'], indent=2))
                     st.download_button("📥 DOWNLOAD REPORT PACK", z_buf.getvalue(), f"{sport}_Report.zip", use_container_width=True)
         st.markdown("</div>", unsafe_allow_html=True)
