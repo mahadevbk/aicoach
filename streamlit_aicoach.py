@@ -272,9 +272,9 @@ def draw_neon_skeleton(img, lms):
     for s, e in FULL_SKELETON:
         p1 = (int(lms[s].x*img.shape[1]), int(lms[s].y*img.shape[0]))
         p2 = (int(lms[e].x*img.shape[1]), int(lms[e].y*img.shape[0]))
-        # Glow Effect
-        cv2.line(img, p1, p2, (127, 255, 0), 8, cv2.LINE_AA) # Outer glow
-        cv2.line(img, p1, p2, (204, 255, 0), 2, cv2.LINE_AA) # Bright core
+        # Refined Glow Effect: Thinner, more proportional lines
+        cv2.line(img, p1, p2, (127, 255, 0), 4, cv2.LINE_AA) # Subtle outer glow
+        cv2.line(img, p1, p2, (204, 255, 0), 1, cv2.LINE_AA) # Sharp core
 
 def render_pro_stereo(p1, p2, h1, h2, f1, f2, fps):
     cap1 = cv2.VideoCapture(p1)
@@ -416,5 +416,6 @@ for i, (sport, actions) in enumerate(SPORT_CONFIG.items()):
                     with zipfile.ZipFile(z_buf, "w") as zf:
                         zf.write(final_v, "analysis.mp4")
                         zf.writestr("telemetry_OPTIMIZED.json", json.dumps(tele_opt))
+                        zf.writestr("telemetry_RAW_DETAILED.json", json.dumps(s['d1']['raw']))
                     st.download_button("📥 DOWNLOAD REPORT PACK", z_buf.getvalue(), f"{sport}_Report.zip", use_container_width=True)
         st.markdown("</div>", unsafe_allow_html=True)
