@@ -269,12 +269,16 @@ def analyze_vid(path, model):
 
 def draw_neon_skeleton(img, lms):
     if not lms: return
+    # Draw Vectors (Grey Lines)
     for s, e in FULL_SKELETON:
         p1 = (int(lms[s].x*img.shape[1]), int(lms[s].y*img.shape[0]))
         p2 = (int(lms[e].x*img.shape[1]), int(lms[e].y*img.shape[0]))
-        # Refined Glow Effect: Thinner, more proportional lines
-        cv2.line(img, p1, p2, (127, 255, 0), 4, cv2.LINE_AA) # Subtle outer glow
-        cv2.line(img, p1, p2, (204, 255, 0), 1, cv2.LINE_AA) # Sharp core
+        cv2.line(img, p1, p2, (128, 128, 128), 2, cv2.LINE_AA)
+    
+    # Draw Points (Red Dots)
+    for i in range(len(lms)):
+        pt = (int(lms[i].x*img.shape[1]), int(lms[i].y*img.shape[0]))
+        cv2.circle(img, pt, 4, (0, 0, 255), -1, cv2.LINE_AA)
 
 def render_pro_stereo(p1, p2, h1, h2, f1, f2, fps):
     cap1 = cv2.VideoCapture(p1)
