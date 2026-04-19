@@ -611,10 +611,19 @@ for i, (sport, actions) in enumerate(SPORT_CONFIG.items()):
                 
                 # Visual Feedback
                 cap1 = cv2.VideoCapture(s['p1']); cap1.set(1, sl1); _, i1 = cap1.read(); cap1.release()
+                i1 = cv2.cvtColor(i1, cv2.COLOR_BGR2RGB)
+                h_target = 480
+                
                 if s['p2']:
                     cap2 = cv2.VideoCapture(s['p2']); cap2.set(1, sl2); _, i2 = cap2.read(); cap2.release()
-                    st.image(np.hstack((cv2.resize(cv2.cvtColor(i1, 4), (640, 480)), cv2.resize(cv2.cvtColor(i2, 4), (640, 480)))))
-                else: st.image(cv2.cvtColor(i1, 4), width=640)
+                    i2 = cv2.cvtColor(i2, cv2.COLOR_BGR2RGB)
+                    
+                    # Proportional Resize
+                    w1 = int(i1.shape[1] * (h_target / i1.shape[0]))
+                    w2 = int(i2.shape[1] * (h_target / i2.shape[0]))
+                    st.image(np.hstack((cv2.resize(i1, (w1, h_target)), cv2.resize(i2, (w2, h_target)))), width="stretch")
+                else: 
+                    st.image(i1, width="stretch")
 
                 # --- PRO ANALYTICS DASHBOARD ---
                 st.markdown("### 📊 PRO ANALYTICS DASHBOARD")
