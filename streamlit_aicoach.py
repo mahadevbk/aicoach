@@ -25,25 +25,37 @@ class NumpyEncoder(json.JSONEncoder):
         return super(NumpyEncoder, self).default(obj)
 
 def generate_pro_report(brief_content):
-    # Try multiple model variants to resolve 404/NotFound issues on different API tiers
-    model_names = ['gemini-1.5-flash', 'gemini-1.5-flash-latest', 'gemini-pro']
-    
-    last_error = ""
-    for name in model_names:
-        try:
-            report_model = genai.GenerativeModel(name)
-            instructions = """
-            Act as a Senior Biomechanical Engineer. 
-            Use the following telemetry data to create a report exactly like the Claude example.
-            Include Tables, Phase Analysis, and specific Drills.
-            """
-            response = report_model.generate_content([instructions, brief_content])
-            return response.text
-        except Exception as e:
-            last_error = str(e)
-            continue
+    # Auto-discover the best available model to avoid 404/NotFound errors
+    try:
+        # Get models that support generateContent
+        supported_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+        
+        # Priority list
+        priority = ['models/gemini-1.5-flash', 'models/gemini-1.5-flash-latest', 'models/gemini-pro', 'models/gemini-1.0-pro']
+        selected_model = None
+        
+        for p in priority:
+            if p in supported_models:
+                selected_model = p
+                break
+        
+        if not selected_model and supported_models:
+            selected_model = supported_models[0]
             
-    return f"⚠️ AI Generation Error: All models failed. Last error: {last_error}"
+        if not selected_model:
+            return "⚠️ AI Generation Error: No suitable Gemini models found for this API Key."
+
+        report_model = genai.GenerativeModel(selected_model)
+        instructions = """
+        Act as a Senior Biomechanical Engineer. 
+        Use the following telemetry data to create a report exactly like the Claude example.
+        Include Tables, Phase Analysis, and specific Drills.
+        """
+        response = report_model.generate_content([instructions, brief_content])
+        return response.text
+        
+    except Exception as e:
+        return f"⚠️ AI Generation Error: {str(e)}"
 
 class PDFReport(FPDF):
     def header(self):
@@ -123,8 +135,8 @@ import plotly.graph_objects as go
 import plotly.express as px
 
 # Setup
-# Using transport='rest' often resolves 404/NotFound errors on cloud platforms
-genai.configure(api_key=st.secrets["GEMINI_API_KEY"], transport='rest')
+# Updated library ensures model compatibility
+genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
 
 
 
