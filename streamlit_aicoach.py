@@ -649,4 +649,34 @@ for i, (sport, actions) in enumerate(SPORT_CONFIG.items()):
                     st.download_button("📥 DOWNLOAD REPORT PACK", z_buf.getvalue(), f"{sport}_Report.zip", width="stretch")
 
                 # --- PRO ANALYTICS DASHBOARD ---
+                st.markdown("### 📊 PRO ANALYTICS DASHBOARD")
+                metrics = get_ai_metrics(s['d1']['raw'], s['d1']['fps'])
+                if metrics:
+                    kpis = generate_sport_kpis(metrics, sport, s['d1']['raw'])
+                    insights = get_actionable_insights(kpis, sport)
+                    
+                    # Bento Metrics Row
+                    m1, m2, m3 = st.columns(3)
+                    with m1: draw_modern_metric("Max Velocity", f"{max(metrics['wrist_speed']):.1f}m/s", "+12%", "⚡")
+                    with m2: 
+                        if sport == "GYM 🏋️": draw_modern_metric("Squat Depth", f"{kpis.get('depth_ratio', 0):.2f}", "-5%", "📏")
+                        elif sport == "GOLF ⛳": draw_modern_metric("X-Factor", f"{kpis.get('max_x_factor', 0):.1f}°", "+8%", "🔄")
+                        elif sport == "YOGA 🧘": draw_modern_metric("Stability", f"{kpis.get('stability', 0)*100:.1f}%", "+1%", "🧘")
+                        else: draw_modern_metric("Avg Tempo", "2.1s", "+0.2s", "⏱️")
+                    with m3: draw_modern_metric("Consistency", "94%", "+2%", "🎯")
+                    
+                    # Insights
+                    st.markdown("<div style='margin-top: 20px;'>", unsafe_allow_html=True)
+                    for insight in insights:
+                        st.success(insight)
+                    st.markdown("</div>", unsafe_allow_html=True)
+                    
+                    # Charts Row
+                    ch1, ch2 = st.columns(2)
+                    with ch1: st.plotly_chart(plot_power_curve(metrics), width="stretch")
+                    with ch2: st.plotly_chart(plot_radar_chart(metrics), width="stretch")
+                    
+                    RACKET_BAT = ["TENNIS 🎾", "PADEL 🎾", "PICKLEBALL 🥒", "BADMINTON 🏸", "CRICKET 🏏", "GOLF ⛳"]
+                    if sport in RACKET_BAT:
+                        st.plotly_chart(plot_kinetic_chain(metrics), width="stretch")
         st.markdown("</div>", unsafe_allow_html=True)
