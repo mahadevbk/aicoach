@@ -585,6 +585,7 @@ for i, (sport, actions) in enumerate(SPORT_CONFIG.items()):
                     <span><b>2.</b> Sync Impact Frame (if needed)</span>
                     <span><b>3.</b> Align Stereographic Sliders</span>
                     <span><b>4.</b> Generate Analysis Pack</span>
+                    <span><b>5.</b> Upload JSON to Claude/GPT/Gemini for analysis</span>
                 </div>
             </div>
         """, unsafe_allow_html=True)
