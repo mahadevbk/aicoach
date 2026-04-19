@@ -138,16 +138,35 @@ def create_docx_report(text, sport_name):
     return bio.getvalue()
 
 class PDFReport(FPDF):
+    def __init__(self):
+        super().__init__(format='A4') # Force A4 Format
+        self.custom_font_active = False
+        
+        # Attempt to load custom font
+        try:
+            font_path = os.path.join(tempfile.gettempdir(), "BitcountPropSingle-Medium.ttf")
+            if not os.path.exists(font_path):
+                # Using a direct raw link to a similar styled high-end variable font or public TTF
+                # Note: Bitcount is a commercial/licensed font on some platforms, 
+                # but we will try to load the local system version or a fallback.
+                urllib.request.urlretrieve("https://github.com/google/fonts/raw/main/ofl/robotoflex/RobotoFlex%5BGRAD%2CXOPQ%2CXTRA%2CYOPQ%2CYTLC%2CYTAS%2CYTDE%2CYTFI%2Copsz%2Cslnt%2Cwdth%2Cwght%5D.ttf", font_path)
+            
+            self.add_font("CustomFont", "", font_path)
+            self.custom_font_active = True
+        except:
+            self.custom_font_active = False
+
     def header(self):
-        self.set_font('helvetica', 'B', 16)
+        f_name = "CustomFont" if self.custom_font_active else "helvetica"
+        self.set_font(f_name, '', 22) # Heading 1
         self.set_text_color(0, 180, 255) # Professional Blue
-        self.cell(0, 10, 'VECTOR VICTOR AI', border=False, align='C', new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-        self.set_font('helvetica', 'B', 10)
+        self.cell(0, 15, 'VECTOR VICTOR AI', border=False, align='C', new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        self.set_font(f_name, '', 12)
         self.set_text_color(100, 100, 100)
         self.cell(0, 5, 'BIO MECHANICAL ANALYSIS REPORT', border=False, align='C', new_x=XPos.LMARGIN, new_y=YPos.NEXT)
         self.ln(5)
         self.set_draw_color(0, 180, 255)
-        self.line(10, 30, 200, 30)
+        self.line(10, 35, 200, 35)
         self.ln(10)
 
     def footer(self):
@@ -167,11 +186,13 @@ def create_pdf_report(text, sport_name):
     pdf.alias_nb_pages()
     pdf.add_page()
     
+    f_main = "CustomFont" if pdf.custom_font_active else "helvetica"
+    
     # Metadata
-    pdf.set_font('helvetica', 'B', 11)
+    pdf.set_font(f_main, '', 12)
     pdf.set_text_color(0, 0, 0)
     pdf.cell(0, 8, f"Sport: {clean_for_pdf(sport_name)}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-    pdf.set_font('helvetica', '', 9)
+    pdf.set_font(f_main, '', 10)
     pdf.cell(0, 5, f"Date: {time.strftime('%Y-%m-%d %H:%M:%S')}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
     pdf.ln(5)
 
@@ -193,10 +214,9 @@ def create_pdf_report(text, sport_name):
         else:
             if in_table and table_data:
                 # Render PDF Table
-                pdf.set_font('helvetica', 'B', 9)
+                pdf.set_font(f_main, '', 9)
                 col_width = (pdf.w - 20) / len(table_data[0])
                 for r_idx, row in enumerate(table_data):
-                    if r_idx > 0: pdf.set_font('helvetica', '', 9)
                     for val in row:
                         pdf.cell(col_width, 8, val, border=1)
                     pdf.ln(8)
@@ -210,29 +230,33 @@ def create_pdf_report(text, sport_name):
 
         pdf.set_x(10)
         if clean_line.startswith('### '):
-            pdf.set_font('helvetica', 'B', 11)
+            pdf.set_font(f_main, '', 12)
             pdf.set_text_color(80, 80, 80)
             pdf.multi_cell(0, 8, clean_line.replace('### ', ''), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
         elif clean_line.startswith('## '):
-            pdf.set_font('helvetica', 'B', 13)
+            pdf.set_font(f_main, '', 14)
             pdf.set_text_color(0, 0, 0)
             pdf.multi_cell(0, 10, clean_line.replace('## ', ''), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
         elif clean_line.startswith('* ') or clean_line.startswith('- '):
-            pdf.set_font('helvetica', '', 10)
+            pdf.set_font(f_main, '', 10)
             pdf.set_text_color(0, 0, 0)
             pdf.multi_cell(0, 6, f"  - {clean_line[2:]}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
         else:
-            pdf.set_font('helvetica', '', 10)
+            pdf.set_font(f_main, '', 10)
             pdf.set_text_color(0, 0, 0)
             if '**' in clean_line:
                 parts = clean_line.split('**')
                 for idx_p, part in enumerate(parts):
-                    if idx_p % 2 == 1: pdf.set_font('helvetica', 'B', 10)
-                    else: pdf.set_font('helvetica', '', 10)
+                    # Manual toggle for bold weight simulation if using standard font
+                    if not pdf.custom_font_active:
+                        if idx_p % 2 == 1: pdf.set_font(f_main, 'B', 10)
+                        else: pdf.set_font(f_main, '', 10)
                     pdf.write(6, part)
                 pdf.ln(6)
             else:
                 pdf.multi_cell(0, 6, clean_line, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+
+    return bytes(pdf.output())
 
     return bytes(pdf.output())
 
