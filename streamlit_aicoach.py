@@ -54,7 +54,7 @@ st.markdown("""
         backdrop-filter: blur(12px); 
         border: 1px solid var(--glass-border); 
         border-radius: 24px; 
-        padding: 2rem; 
+        padding: 1.5rem; 
         margin-bottom: 2rem; 
         transition: all 0.3s ease;
     }
@@ -576,6 +576,19 @@ tabs = st.tabs(list(SPORT_CONFIG.keys()))
 
 for i, (sport, actions) in enumerate(SPORT_CONFIG.items()):
     with tabs[i]:
+        # How to Use Section
+        st.markdown("""
+            <div class="glass-card">
+                <div style="color: #ccff00; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px;">🚀 Quick Start Guide</div>
+                <div style="font-size: 0.9rem; color: #94a3b8; display: flex; gap: 20px; flex-wrap: wrap;">
+                    <span><b>1.</b> Upload Video(s)</span>
+                    <span><b>2.</b> Sync Impact Frame (if needed)</span>
+                    <span><b>3.</b> Align Stereographic Sliders</span>
+                    <span><b>4.</b> Generate Analysis Pack</span>
+                </div>
+            </div>
+        """, unsafe_allow_html=True)
+        
         c1, c2 = st.columns([1, 2])
         res_key = f"data_{sport}"
         
