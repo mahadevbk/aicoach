@@ -598,6 +598,10 @@ for i, (sport, actions) in enumerate(SPORT_CONFIG.items()):
         with c2:
             if res_key in st.session_state:
                 s = st.session_state[res_key]
+                
+                if s['p2']:
+                    st.warning("⚠️ **STEREOGRAPHIC SYNC:** Use the sliders below to ensure both views are perfectly aligned on the **Impact Frame** before generating the pack.")
+                
                 sl1 = st.slider("Lead Frame", 0, s['d1']['total']-1, s['d1']['impact'], key=f"sl1_{sport}")
                 sl2 = st.slider("Side Frame", 0, (s['d2']['total']-1 if s['d2'] else 0), (s['d2']['impact'] if s['d2'] else 0), key=f"sl2_{sport}") if s['d2'] else 0
                 
