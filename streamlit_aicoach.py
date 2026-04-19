@@ -99,25 +99,26 @@ def create_pdf_report(text, sport_name):
             pdf.ln(2)
             continue
             
+        # FORCE LEFT MARGIN before every line to prevent "Not enough horizontal space" errors
+        pdf.set_x(10)
+
         if line.startswith('### '):
             pdf.set_font('helvetica', 'B', 11)
             pdf.set_text_color(80, 80, 80)
-            pdf.multi_cell(0, 8, line.replace('### ', ''))
+            pdf.multi_cell(0, 8, line.replace('### ', ''), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
             pdf.ln(1)
         elif line.startswith('## '):
             pdf.set_font('helvetica', 'B', 13)
             pdf.set_text_color(0, 0, 0)
-            pdf.multi_cell(0, 10, line.replace('## ', ''))
+            pdf.multi_cell(0, 10, line.replace('## ', ''), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
             pdf.ln(2)
         elif line.startswith('* ') or line.startswith('- '):
             pdf.set_font('helvetica', '', 10)
             pdf.set_text_color(0, 0, 0)
-            # Use multi_cell for the entire bullet to avoid mixing with write()
-            pdf.multi_cell(0, 6, f"  - {line[2:]}")
+            pdf.multi_cell(0, 6, f"  - {line[2:]}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
         else:
             pdf.set_font('helvetica', '', 10)
             pdf.set_text_color(0, 0, 0)
-            # Basic Bold detection using write() for the whole paragraph
             if '**' in line:
                 parts = line.split('**')
                 for i, part in enumerate(parts):
@@ -126,7 +127,7 @@ def create_pdf_report(text, sport_name):
                     pdf.write(6, part)
                 pdf.ln(6)
             else:
-                pdf.multi_cell(0, 6, line)
+                pdf.multi_cell(0, 6, line, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
                 
     return bytes(pdf.output())
 
