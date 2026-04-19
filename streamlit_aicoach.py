@@ -25,25 +25,25 @@ class NumpyEncoder(json.JSONEncoder):
         return super(NumpyEncoder, self).default(obj)
 
 def generate_pro_report(brief_content):
-    # Trying 'gemini-1.5-flash-latest' which is often more reliable on some API versions
-    try:
-        report_model = genai.GenerativeModel('gemini-1.5-flash')
-        # Combine Instructions + the Data (brief_content)
-        instructions = """
-        Act as a Senior Biomechanical Engineer. 
-        Use the following telemetry data to create a report exactly like the Claude example.
-        Include Tables, Phase Analysis, and specific Drills.
-        """
-        response = report_model.generate_content([instructions, brief_content])
-        return response.text
-    except Exception as e:
-        # Fallback attempt with explicit 'models/' prefix if the first one fails
+    # Try multiple model variants to resolve 404/NotFound issues on different API tiers
+    model_names = ['gemini-1.5-flash', 'gemini-1.5-flash-latest', 'gemini-pro']
+    
+    last_error = ""
+    for name in model_names:
         try:
-            report_model = genai.GenerativeModel('models/gemini-1.5-flash')
+            report_model = genai.GenerativeModel(name)
+            instructions = """
+            Act as a Senior Biomechanical Engineer. 
+            Use the following telemetry data to create a report exactly like the Claude example.
+            Include Tables, Phase Analysis, and specific Drills.
+            """
             response = report_model.generate_content([instructions, brief_content])
             return response.text
-        except:
-            return f"⚠️ AI Generation Error: {str(e)}"
+        except Exception as e:
+            last_error = str(e)
+            continue
+            
+    return f"⚠️ AI Generation Error: All models failed. Last error: {last_error}"
 
 class PDFReport(FPDF):
     def header(self):
@@ -113,7 +113,8 @@ def create_pdf_report(text, sport_name):
             else:
                 pdf.multi_cell(0, 6, line)
                 
-    return pdf.output()
+    # Ensure bytes output for Streamlit
+    return bytes(pdf.output())
 
 # --- 1. FULL PREMIUM UI ---
 st.set_page_config(page_title="Vector Victor AI Skeletonkey", page_icon="🎾", layout="wide", initial_sidebar_state="collapsed")
@@ -777,19 +778,27 @@ for i, (sport, actions) in enumerate(SPORT_CONFIG.items()):
                         
                         with st.status("Vector Victor AI is analyzing your biomechanics...") as status:
                             report_text = generate_pro_report(coaching_brief)
-                            status.update(label="Analysis Complete!", state="complete", expanded=True)
-                            st.markdown("---")
-                            st.markdown(report_text)
                             
-                            # Generate the PDF
-                            pdf_file = create_pdf_report(report_text, sport)
-                            st.download_button(
-                                "📄 DOWNLOAD PROFESSIONAL PDF REPORT", 
-                                pdf_file, 
-                                f"{sport}_Pro_Analysis.pdf", 
-                                "application/pdf",
-                                width="stretch"
-                            )
+                            if "⚠️" in report_text:
+                                status.update(label="Analysis Failed", state="error", expanded=True)
+                                st.error(report_text)
+                            else:
+                                status.update(label="Analysis Complete!", state="complete", expanded=True)
+                                st.markdown("---")
+                                st.markdown(report_text)
+                                
+                                # Generate the PDF only on success
+                                try:
+                                    pdf_file = create_pdf_report(report_text, sport)
+                                    st.download_button(
+                                        "📄 DOWNLOAD PROFESSIONAL PDF REPORT", 
+                                        pdf_file, 
+                                        f"{sport}_Pro_Analysis.pdf", 
+                                        "application/pdf",
+                                        width="stretch"
+                                    )
+                                except Exception as pdf_err:
+                                    st.error(f"❌ PDF Formatting Error: {str(pdf_err)}")
 
                 # --- PRO ANALYTICS DASHBOARD ---
                 st.markdown("### 📊 PRO ANALYTICS DASHBOARD")
