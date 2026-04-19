@@ -502,18 +502,22 @@ def analyze_vid(path, model):
             prev_w = w
     cap.release(); return {"history": history, "raw": raw, "fps": fps, "total": len(history), "impact": impact_f}
 
-def draw_neon_skeleton(img, lms):
+def draw_neon_skeleton(img, lms, alpha=0.5):
     if not lms: return
+    overlay = img.copy()
     # Draw Vectors (Grey Lines)
     for s, e in FULL_SKELETON:
         p1 = (int(lms[s].x*img.shape[1]), int(lms[s].y*img.shape[0]))
         p2 = (int(lms[e].x*img.shape[1]), int(lms[e].y*img.shape[0]))
-        cv2.line(img, p1, p2, (128, 128, 128), 2, cv2.LINE_AA)
+        cv2.line(overlay, p1, p2, (128, 128, 128), 2, cv2.LINE_AA)
     
     # Draw Points (Red Dots)
     for i in range(len(lms)):
         pt = (int(lms[i].x*img.shape[1]), int(lms[i].y*img.shape[0]))
-        cv2.circle(img, pt, 4, (0, 0, 255), -1, cv2.LINE_AA)
+        cv2.circle(overlay, pt, 4, (0, 0, 255), -1, cv2.LINE_AA)
+    
+    # Blend the overlay with the original image
+    cv2.addWeighted(overlay, alpha, img, 1 - alpha, 0, img)
 
 def render_pro_stereo(p1, p2, h1, h2, f1, f2, fps):
     cap1 = cv2.VideoCapture(p1)
