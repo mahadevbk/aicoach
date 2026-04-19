@@ -576,7 +576,6 @@ tabs = st.tabs(list(SPORT_CONFIG.keys()))
 
 for i, (sport, actions) in enumerate(SPORT_CONFIG.items()):
     with tabs[i]:
-        st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
         c1, c2 = st.columns([1, 2])
         res_key = f"data_{sport}"
         
@@ -679,4 +678,3 @@ for i, (sport, actions) in enumerate(SPORT_CONFIG.items()):
                     RACKET_BAT = ["TENNIS 🎾", "PADEL 🎾", "PICKLEBALL 🥒", "BADMINTON 🏸", "CRICKET 🏏", "GOLF ⛳"]
                     if sport in RACKET_BAT:
                         st.plotly_chart(plot_kinetic_chain(metrics), width="stretch")
-        st.markdown("</div>", unsafe_allow_html=True)
