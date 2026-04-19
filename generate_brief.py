@@ -305,7 +305,7 @@ def generate_brief(oj: dict) -> str:
     brief.append("Position flags at event:")
     brief.append(f"  Dom wrist above dom shoulder:    {wrist_above}  [{wa_s}]")
     brief.append(f"  Feet grounded:                   {ev.get('feet_grounded', False)}")
-    brief.append(f"  Stance width ratio:              {ev.get('stance_width_ratio') or 0:.3f}")
+    brief.append(f"  Stance width ratio:              {float(ev.get('stance_width_ratio') or 0):.3f}")
     
     brief.append("")
     brief.append("## SECTION 4 — PHASE SNAPSHOTS")
