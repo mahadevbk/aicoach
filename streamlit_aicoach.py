@@ -88,7 +88,7 @@ def create_pdf_report(text, sport_name):
     pdf.cell(0, 10, f"Sport: {clean_for_pdf(sport_name)}", ln=True)
     pdf.set_font('helvetica', '', 9)
     pdf.cell(0, 5, f"Analysis Date: {time.strftime('%Y-%m-%d %H:%M:%S')}", ln=True)
-    pdf.ln(5)
+    pdf.ln(10)
 
     # Process text for basic formatting
     lines = text.split('\n')
@@ -102,19 +102,21 @@ def create_pdf_report(text, sport_name):
             pdf.set_font('helvetica', 'B', 11)
             pdf.set_text_color(80, 80, 80)
             pdf.multi_cell(0, 8, line.replace('### ', ''))
+            pdf.ln(1)
         elif line.startswith('## '):
             pdf.set_font('helvetica', 'B', 13)
             pdf.set_text_color(0, 0, 0)
             pdf.multi_cell(0, 10, line.replace('## ', ''))
+            pdf.ln(2)
         elif line.startswith('* ') or line.startswith('- '):
             pdf.set_font('helvetica', '', 10)
             pdf.set_text_color(0, 0, 0)
-            pdf.write(6, "  - ")
-            pdf.multi_cell(0, 6, line[2:])
+            # Use multi_cell for the entire bullet to avoid mixing with write()
+            pdf.multi_cell(0, 6, f"  - {line[2:]}")
         else:
             pdf.set_font('helvetica', '', 10)
             pdf.set_text_color(0, 0, 0)
-            # Basic Bold detection
+            # Basic Bold detection using write() for the whole paragraph
             if '**' in line:
                 parts = line.split('**')
                 for i, part in enumerate(parts):
@@ -125,7 +127,6 @@ def create_pdf_report(text, sport_name):
             else:
                 pdf.multi_cell(0, 6, line)
                 
-    # Ensure bytes output for Streamlit
     return bytes(pdf.output())
 
 # --- 1. FULL PREMIUM UI ---
