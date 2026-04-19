@@ -257,7 +257,7 @@ def generate_brief(oj: dict) -> str:
     wa_b, wa_s = get_b("dom_wrist_above_shoulder", wrist_above)
 
     brief = []
-    brief.append("=== SKELETONKEY COACHING BRIEF ===")
+    brief.append("=== VECTOR VICTOR AI - BIO MECHANICAL ANALYSIS ===")
     brief.append("")
     brief.append("## SECTION 1 — IDENTITY")
     brief.append(f"Sport:          {sport}")
@@ -305,7 +305,7 @@ def generate_brief(oj: dict) -> str:
     brief.append("Position flags at event:")
     brief.append(f"  Dom wrist above dom shoulder:    {wrist_above}  [{wa_s}]")
     brief.append(f"  Feet grounded:                   {ev.get('feet_grounded', False)}")
-    brief.append(f"  Stance width ratio:              {ev.get('stance_width_ratio', 0):.3f}")
+    brief.append(f"  Stance width ratio:              {ev.get('stance_width_ratio') or 0:.3f}")
     
     brief.append("")
     brief.append("## SECTION 4 — PHASE SNAPSHOTS")

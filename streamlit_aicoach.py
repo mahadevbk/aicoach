@@ -849,7 +849,10 @@ for i, (sport, actions) in enumerate(SPORT_CONFIG.items()):
                     z_buf = io.BytesIO()
                     with zipfile.ZipFile(z_buf, "w") as zf:
                         zf.write(st.session_state[f"video_{sport}"], "analysis.mp4")
-                        zf.writestr("SHARE_FILE_WITH_AI.txt", st.session_state[f"brief_{sport}"])
+                        if f"brief_{sport}" in st.session_state:
+                            zf.writestr("SHARE_FILE_WITH_AI.txt", st.session_state[f"brief_{sport}"])
+                        else:
+                            zf.writestr("SHARE_FILE_WITH_AI.txt", "Brief not yet generated.")
                     
                     st.download_button("📥 DOWNLOAD VIDEO & AI BRIEF", z_buf.getvalue(), f"{sport}_Report.zip", width="stretch")
 
