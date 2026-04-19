@@ -22,7 +22,7 @@ class NumpyEncoder(json.JSONEncoder):
         return super(NumpyEncoder, self).default(obj)
 
 # --- 1. FULL PREMIUM UI ---
-st.set_page_config(page_title="Deepform | Pro Analytics", page_icon="🎾", layout="wide", initial_sidebar_state="collapsed")
+st.set_page_config(page_title="Vector Victor AI | Pro Analytics", page_icon="🎾", layout="wide", initial_sidebar_state="collapsed")
 
 import plotly.graph_objects as go
 import plotly.express as px
@@ -558,7 +558,7 @@ def render_pro_stereo(p1, p2, h1, h2, f1, f2, fps):
     return final_p
 
 # --- 4. UI ---
-st.markdown("<h1>DEEPFORM</h1>", unsafe_allow_html=True)
+st.markdown("<h1>Vector Victor AI</h1>", unsafe_allow_html=True)
 st.markdown("<p class='hero-sub'>Professional Biomechanics AI</p>", unsafe_allow_html=True)
 
 SPORT_CONFIG = {
@@ -582,7 +582,7 @@ for i, (sport, actions) in enumerate(SPORT_CONFIG.items()):
             u1 = st.file_uploader("Lead Angle", type=["mp4","mov"], key=f"u1_{sport}")
             u2 = st.file_uploader("Side Angle", type=["mp4","mov"], key=f"u2_{sport}") if is_stereo else None
             sel_act = st.selectbox("Action", actions, key=f"act_{sport}")
-            if st.button("RUN PRO ANALYSIS", key=f"run_{sport}", use_container_width=True):
+            if st.button("RUN PRO ANALYSIS", key=f"run_{sport}", width="stretch"):
                 model = download_model()
                 t1_p = os.path.join(tempfile.gettempdir(), f"l_{sport}.mp4")
                 with open(t1_p, "wb") as f: f.write(u1.getbuffer())
@@ -633,14 +633,14 @@ for i, (sport, actions) in enumerate(SPORT_CONFIG.items()):
                     
                     # Charts Row
                     ch1, ch2 = st.columns(2)
-                    with ch1: st.plotly_chart(plot_power_curve(metrics), use_container_width=True)
-                    with ch2: st.plotly_chart(plot_radar_chart(metrics), use_container_width=True)
+                    with ch1: st.plotly_chart(plot_power_curve(metrics), width="stretch")
+                    with ch2: st.plotly_chart(plot_radar_chart(metrics), width="stretch")
                     
                     RACKET_BAT = ["TENNIS 🎾", "PADEL 🎾", "PICKLEBALL 🥒", "BADMINTON 🏸", "CRICKET 🏏", "GOLF ⛳"]
                     if sport in RACKET_BAT:
-                        st.plotly_chart(plot_kinetic_chain(metrics), use_container_width=True)
+                        st.plotly_chart(plot_kinetic_chain(metrics), width="stretch")
 
-                if st.button("🎬 GENERATE PRODUCTION PACK", key=f"gen_{sport}", use_container_width=True):
+                if st.button("🎬 GENERATE PRODUCTION PACK", key=f"gen_{sport}", width="stretch"):
                     final_v = render_pro_stereo(s['p1'], s['p2'], s['d1']['history'], (s['d2']['history'] if s['d2'] else []), sl1, sl2, s['d1']['fps'])
                     st.video(final_v)
                     
@@ -656,5 +656,5 @@ for i, (sport, actions) in enumerate(SPORT_CONFIG.items()):
                         zf.write(final_v, "analysis.mp4")
                         zf.writestr("telemetry_OPTIMIZED.json", json.dumps(tele_opt, indent=2, cls=NumpyEncoder))
                         zf.writestr("telemetry_RAW_DETAILED.json", json.dumps(s['d1']['raw'], indent=2, cls=NumpyEncoder))
-                    st.download_button("📥 DOWNLOAD REPORT PACK", z_buf.getvalue(), f"{sport}_Report.zip", use_container_width=True)
+                    st.download_button("📥 DOWNLOAD REPORT PACK", z_buf.getvalue(), f"{sport}_Report.zip", width="stretch")
         st.markdown("</div>", unsafe_allow_html=True)
