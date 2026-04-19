@@ -12,6 +12,7 @@ import io
 import urllib.request
 import subprocess
 import time
+from generate_brief import generate_brief
 
 class NumpyEncoder(json.JSONEncoder):
     def default(self, obj):
@@ -255,6 +256,7 @@ def build_pro_telemetry(raw_frames, sport_raw, action, event_frame, fps, camera_
             "r_elbow_angle": calculate_3d_angle(f[12], f[14], f[16]), "l_elbow_angle": calculate_3d_angle(f[11], f[13], f[15]),
             "r_knee_angle": calculate_3d_angle(f[24], f[26], f[28]), "l_knee_angle": calculate_3d_angle(f[23], f[25], f[27]),
             "r_hip_angle": calculate_3d_angle(f[12], f[24], f[26]), "l_hip_angle": calculate_3d_angle(f[11], f[23], f[25]),
+            "r_shoulder_abduction_angle": calculate_3d_angle(f[14], f[12], f[24]), "l_shoulder_abduction_angle": calculate_3d_angle(f[13], f[11], f[23]),
             "shoulder_tilt_deg": round(tilt, 1),
             "trunk_forward_lean": calculate_lean(mid_s, mid_h, 'sagittal'), "trunk_lateral_lean": calculate_lean(mid_s, mid_h, 'coronal'),
             "shoulder_z_diff": round(f[12]['z'] - f[11]['z'], 3), "hip_z_diff": round(f[24]['z'] - f[23]['z'], 3),
@@ -656,11 +658,14 @@ for i, (sport, actions) in enumerate(SPORT_CONFIG.items()):
                         s['d1']['fps'], "dual" if s['p2'] else "lead"
                     )
                     
+                    # Generate Coaching Brief
+                    coaching_brief = generate_brief(tele_opt)
+                    
                     z_buf = io.BytesIO()
                     with zipfile.ZipFile(z_buf, "w") as zf:
                         zf.write(final_v, "analysis.mp4")
                         zf.writestr("telemetry_OPTIMIZED.json", json.dumps(tele_opt, indent=2, cls=NumpyEncoder))
-                        zf.writestr("telemetry_RAW_DETAILED.json", json.dumps(s['d1']['raw'], indent=2, cls=NumpyEncoder))
+                        zf.writestr("COACHING_BRIEF.txt", coaching_brief)
                     st.download_button("📥 DOWNLOAD REPORT PACK", z_buf.getvalue(), f"{sport}_Report.zip", width="stretch")
 
                 # --- PRO ANALYTICS DASHBOARD ---
