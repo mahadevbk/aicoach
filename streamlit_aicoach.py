@@ -583,8 +583,8 @@ for i, (sport, actions) in enumerate(SPORT_CONFIG.items()):
         with c1:
             st.info(f"AI ENGINE: {sport}")
             is_stereo = st.toggle("Stereographic Mode", value=True, key=f"st_{sport}")
-            u1 = st.file_uploader("Lead Angle", type=["mp4","mov"], key=f"u1_{sport}")
-            u2 = st.file_uploader("Side Angle", type=["mp4","mov"], key=f"u2_{sport}") if is_stereo else None
+            u1 = st.file_uploader("Source 1", type=["mp4","mov"], key=f"u1_{sport}")
+            u2 = st.file_uploader("Source 2", type=["mp4","mov"], key=f"u2_{sport}") if is_stereo else None
             sel_act = st.selectbox("Action", actions, key=f"act_{sport}")
             if st.button("RUN PRO ANALYSIS", key=f"run_{sport}", width="stretch"):
                 model = download_model()
@@ -606,8 +606,8 @@ for i, (sport, actions) in enumerate(SPORT_CONFIG.items()):
                 if s['p2']:
                     st.warning("⚠️ **STEREOGRAPHIC SYNC:** Use the sliders below to ensure both views are perfectly aligned on the **Impact Frame** before generating the pack.")
                 
-                sl1 = st.slider("Lead Frame", 0, s['d1']['total']-1, s['d1']['impact'], key=f"sl1_{sport}")
-                sl2 = st.slider("Side Frame", 0, (s['d2']['total']-1 if s['d2'] else 0), (s['d2']['impact'] if s['d2'] else 0), key=f"sl2_{sport}") if s['d2'] else 0
+                sl1 = st.slider("Source 1 Frame", 0, s['d1']['total']-1, s['d1']['impact'], key=f"sl1_{sport}")
+                sl2 = st.slider("Source 2 Frame", 0, (s['d2']['total']-1 if s['d2'] else 0), (s['d2']['impact'] if s['d2'] else 0), key=f"sl2_{sport}") if s['d2'] else 0
                 
                 # Visual Feedback
                 cap1 = cv2.VideoCapture(s['p1']); cap1.set(1, sl1); _, i1 = cap1.read(); cap1.release()
@@ -630,39 +630,7 @@ for i, (sport, actions) in enumerate(SPORT_CONFIG.items()):
                     h, w = i1.shape[:2]
                     st.image(cv2.resize(i1, (int(w*0.5), int(h*0.5))), width="stretch")
 
-                # --- PRO ANALYTICS DASHBOARD ---
-                st.markdown("### 📊 PRO ANALYTICS DASHBOARD")
-                metrics = get_ai_metrics(s['d1']['raw'], s['d1']['fps'])
-                if metrics:
-                    kpis = generate_sport_kpis(metrics, sport, s['d1']['raw'])
-                    insights = get_actionable_insights(kpis, sport)
-                    
-                    # Bento Metrics Row
-                    m1, m2, m3 = st.columns(3)
-                    with m1: draw_modern_metric("Max Velocity", f"{max(metrics['wrist_speed']):.1f}m/s", "+12%", "⚡")
-                    with m2: 
-                        if sport == "GYM 🏋️": draw_modern_metric("Squat Depth", f"{kpis.get('depth_ratio', 0):.2f}", "-5%", "📏")
-                        elif sport == "GOLF ⛳": draw_modern_metric("X-Factor", f"{kpis.get('max_x_factor', 0):.1f}°", "+8%", "🔄")
-                        elif sport == "YOGA 🧘": draw_modern_metric("Stability", f"{kpis.get('stability', 0)*100:.1f}%", "+1%", "🧘")
-                        else: draw_modern_metric("Avg Tempo", "2.1s", "+0.2s", "⏱️")
-                    with m3: draw_modern_metric("Consistency", "94%", "+2%", "🎯")
-                    
-                    # Insights
-                    st.markdown("<div style='margin-top: 20px;'>", unsafe_allow_html=True)
-                    for insight in insights:
-                        st.success(insight)
-                    st.markdown("</div>", unsafe_allow_html=True)
-                    
-                    # Charts Row
-                    ch1, ch2 = st.columns(2)
-                    with ch1: st.plotly_chart(plot_power_curve(metrics), width="stretch")
-                    with ch2: st.plotly_chart(plot_radar_chart(metrics), width="stretch")
-                    
-                    RACKET_BAT = ["TENNIS 🎾", "PADEL 🎾", "PICKLEBALL 🥒", "BADMINTON 🏸", "CRICKET 🏏", "GOLF ⛳"]
-                    if sport in RACKET_BAT:
-                        st.plotly_chart(plot_kinetic_chain(metrics), width="stretch")
-
-                if st.button("🎬 GENERATE PRODUCTION PACK", key=f"gen_{sport}", width="stretch"):
+                if st.button("🎬 GENERATE FINAL ANALYSIS PACK", key=f"gen_{sport}", width="stretch"):
                     final_v = render_pro_stereo(s['p1'], s['p2'], s['d1']['history'], (s['d2']['history'] if s['d2'] else []), sl1, sl2, s['d1']['fps'])
                     st.video(final_v)
                     
@@ -679,4 +647,6 @@ for i, (sport, actions) in enumerate(SPORT_CONFIG.items()):
                         zf.writestr("telemetry_OPTIMIZED.json", json.dumps(tele_opt, indent=2, cls=NumpyEncoder))
                         zf.writestr("telemetry_RAW_DETAILED.json", json.dumps(s['d1']['raw'], indent=2, cls=NumpyEncoder))
                     st.download_button("📥 DOWNLOAD REPORT PACK", z_buf.getvalue(), f"{sport}_Report.zip", width="stretch")
+
+                # --- PRO ANALYTICS DASHBOARD ---
         st.markdown("</div>", unsafe_allow_html=True)
