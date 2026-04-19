@@ -25,45 +25,47 @@ class NumpyEncoder(json.JSONEncoder):
         return super(NumpyEncoder, self).default(obj)
 
 def generate_pro_report(brief_content):
-    # Reverting to standard model name and using a robust try-block
+    # Trying 'gemini-1.5-flash-latest' which is often more reliable on some API versions
     try:
         report_model = genai.GenerativeModel('gemini-1.5-flash')
-        
-        # 1. This is the "PROMPT" (The instructions/persona)
+        # Combine Instructions + the Data (brief_content)
         instructions = """
         Act as a Senior Biomechanical Engineer. 
         Use the following telemetry data to create a report exactly like the Claude example.
         Include Tables, Phase Analysis, and specific Drills.
         """
-        
-        # 2. You combine the Instructions + the Data (brief_content)
         response = report_model.generate_content([instructions, brief_content])
         return response.text
     except Exception as e:
-        return f"⚠️ AI Generation Error: {str(e)}"
+        # Fallback attempt with explicit 'models/' prefix if the first one fails
+        try:
+            report_model = genai.GenerativeModel('models/gemini-1.5-flash')
+            response = report_model.generate_content([instructions, brief_content])
+            return response.text
+        except:
+            return f"⚠️ AI Generation Error: {str(e)}"
 
 class PDFReport(FPDF):
     def header(self):
-        # Set font
         self.set_font('helvetica', 'B', 15)
-        # Title
-        self.set_text_color(0, 242, 254) # Neon Blue
+        self.set_text_color(0, 180, 255) # Deep Blue
         self.cell(0, 10, 'Vector Victor AI: Biomechanical Analysis', border=False, align='C')
         self.ln(10)
-        self.set_draw_color(0, 242, 254)
+        self.set_draw_color(0, 180, 255)
         self.line(10, 20, 200, 20)
         self.ln(5)
 
     def footer(self):
-        # Position at 1.5 cm from bottom
         self.set_y(-15)
-        # Set font
         self.set_font('helvetica', 'I', 8)
         self.set_text_color(128, 128, 128)
-        # Page number
         self.cell(0, 10, f'Page {self.page_no()}/{{nb}} | Professional Biomechanics Engine', align='C')
 
 def create_pdf_report(text, sport_name):
+    # Helper to remove emojis and non-latin-1 characters that crash FPDF
+    def clean_for_pdf(s):
+        return s.encode('latin-1', 'replace').decode('latin-1').replace('?', '')
+
     pdf = PDFReport()
     pdf.alias_nb_pages()
     pdf.add_page()
@@ -71,7 +73,7 @@ def create_pdf_report(text, sport_name):
     # Metadata Info
     pdf.set_font('helvetica', 'B', 11)
     pdf.set_text_color(0, 0, 0)
-    pdf.cell(0, 10, f"Sport: {sport_name}", ln=True)
+    pdf.cell(0, 10, f"Sport: {clean_for_pdf(sport_name)}", ln=True)
     pdf.set_font('helvetica', '', 9)
     pdf.cell(0, 5, f"Analysis Date: {time.strftime('%Y-%m-%d %H:%M:%S')}", ln=True)
     pdf.ln(5)
@@ -79,24 +81,24 @@ def create_pdf_report(text, sport_name):
     # Process text for basic formatting
     lines = text.split('\n')
     for line in lines:
-        line = line.strip()
+        line = clean_for_pdf(line.strip())
         if not line:
             pdf.ln(2)
             continue
             
         if line.startswith('### '):
-            pdf.set_font('helvetica', 'B', 12)
-            pdf.set_text_color(60, 60, 60)
-            pdf.multi_cell(0, 10, line.replace('### ', ''))
+            pdf.set_font('helvetica', 'B', 11)
+            pdf.set_text_color(80, 80, 80)
+            pdf.multi_cell(0, 8, line.replace('### ', ''))
         elif line.startswith('## '):
-            pdf.set_font('helvetica', 'B', 14)
+            pdf.set_font('helvetica', 'B', 13)
             pdf.set_text_color(0, 0, 0)
-            pdf.multi_cell(0, 12, line.replace('## ', ''))
+            pdf.multi_cell(0, 10, line.replace('## ', ''))
         elif line.startswith('* ') or line.startswith('- '):
             pdf.set_font('helvetica', '', 10)
             pdf.set_text_color(0, 0, 0)
-            pdf.write(7, "  • ")
-            pdf.multi_cell(0, 7, line[2:])
+            pdf.write(6, "  - ")
+            pdf.multi_cell(0, 6, line[2:])
         else:
             pdf.set_font('helvetica', '', 10)
             pdf.set_text_color(0, 0, 0)
@@ -106,12 +108,11 @@ def create_pdf_report(text, sport_name):
                 for i, part in enumerate(parts):
                     if i % 2 == 1: pdf.set_font('helvetica', 'B', 10)
                     else: pdf.set_font('helvetica', '', 10)
-                    pdf.write(7, part)
-                pdf.ln(7)
+                    pdf.write(6, part)
+                pdf.ln(6)
             else:
-                pdf.multi_cell(0, 7, line)
+                pdf.multi_cell(0, 6, line)
                 
-    # Use output(dest='S') to return as bytes string
     return pdf.output()
 
 # --- 1. FULL PREMIUM UI ---
@@ -756,8 +757,9 @@ for i, (sport, actions) in enumerate(SPORT_CONFIG.items()):
                         s['d1']['fps'], "dual" if s['p2'] else "lead"
                     )
                     
-                    # Generate Coaching Brief
+                    # Generate Coaching Brief and Save to State
                     coaching_brief = generate_brief(tele_opt)
+                    st.session_state[f"brief_{sport}"] = coaching_brief
                     
                     z_buf = io.BytesIO()
                     with zipfile.ZipFile(z_buf, "w") as zf:
@@ -765,30 +767,29 @@ for i, (sport, actions) in enumerate(SPORT_CONFIG.items()):
                         zf.writestr("SHARE_FILE_WITH_AI.txt", coaching_brief)
                     st.download_button("📥 DOWNLOAD REPORT PACK", z_buf.getvalue(), f"{sport}_Report.zip", width="stretch")
 
-                if st.button("🤖 GENERATE AI COACHING REPORT", key=f"ai_{sport}", width="stretch"):
-                    # New Pro Telemetry for AI
-                    raw_interp = interpolate_landmarks(s['d1']['raw'])
-                    tele_opt = build_pro_telemetry(
-                        raw_interp, sport, sel_act, sl1, 
-                        s['d1']['fps'], "dual" if s['p2'] else "lead"
-                    )
-                    coaching_brief = generate_brief(tele_opt)
+                # Step 2: AI Coaching Report (Only shows if brief is ready)
+                if f"brief_{sport}" in st.session_state:
+                    st.markdown("---")
+                    st.info("💡 **Ready for AI Analysis:** Your biomechanical data has been synchronized. Click below to generate your professional coaching report.")
                     
-                    with st.status("Vector Victor AI is analyzing your biomechanics...") as status:
-                        report_text = generate_pro_report(coaching_brief)
-                        status.update(label="Analysis Complete!", state="complete", expanded=True)
-                        st.markdown("---")
-                        st.markdown(report_text)
+                    if st.button("🤖 GENERATE AI COACHING REPORT", key=f"ai_{sport}", width="stretch"):
+                        coaching_brief = st.session_state[f"brief_{sport}"]
                         
-                        # Generate the PDF
-                        pdf_file = create_pdf_report(report_text, sport)
-                        st.download_button(
-                            "📄 DOWNLOAD PROFESSIONAL PDF REPORT", 
-                            pdf_file, 
-                            f"{sport}_Pro_Analysis.pdf", 
-                            "application/pdf",
-                            width="stretch"
-                        )
+                        with st.status("Vector Victor AI is analyzing your biomechanics...") as status:
+                            report_text = generate_pro_report(coaching_brief)
+                            status.update(label="Analysis Complete!", state="complete", expanded=True)
+                            st.markdown("---")
+                            st.markdown(report_text)
+                            
+                            # Generate the PDF
+                            pdf_file = create_pdf_report(report_text, sport)
+                            st.download_button(
+                                "📄 DOWNLOAD PROFESSIONAL PDF REPORT", 
+                                pdf_file, 
+                                f"{sport}_Pro_Analysis.pdf", 
+                                "application/pdf",
+                                width="stretch"
+                            )
 
                 # --- PRO ANALYTICS DASHBOARD ---
                 st.markdown("### 📊 PRO ANALYTICS DASHBOARD")
