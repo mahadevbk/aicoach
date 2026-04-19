@@ -24,10 +24,9 @@ class NumpyEncoder(json.JSONEncoder):
         return super(NumpyEncoder, self).default(obj)
 
 def generate_pro_report(brief_content):
-    # Use a more explicit model name to resolve 'NotFound' exceptions
-    # Initialize inside the function to ensure thread-safety in Streamlit
+    # Reverting to standard model name and using a robust try-block
     try:
-        report_model = genai.GenerativeModel('models/gemini-1.5-flash')
+        report_model = genai.GenerativeModel('gemini-1.5-flash')
         
         # 1. This is the "PROMPT" (The instructions/persona)
         instructions = """
@@ -49,7 +48,8 @@ import plotly.graph_objects as go
 import plotly.express as px
 
 # Setup
-genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+# Using transport='rest' often resolves 404/NotFound errors on cloud platforms
+genai.configure(api_key=st.secrets["GEMINI_API_KEY"], transport='rest')
 
 
 
