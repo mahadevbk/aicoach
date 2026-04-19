@@ -664,8 +664,7 @@ for i, (sport, actions) in enumerate(SPORT_CONFIG.items()):
                     z_buf = io.BytesIO()
                     with zipfile.ZipFile(z_buf, "w") as zf:
                         zf.write(final_v, "analysis.mp4")
-                        zf.writestr("telemetry_OPTIMIZED.json", json.dumps(tele_opt, indent=2, cls=NumpyEncoder))
-                        zf.writestr("COACHING_BRIEF.txt", coaching_brief)
+                        zf.writestr("SHARE_FILE_WITH_AI.txt", coaching_brief)
                     st.download_button("📥 DOWNLOAD REPORT PACK", z_buf.getvalue(), f"{sport}_Report.zip", width="stretch")
 
                 # --- PRO ANALYTICS DASHBOARD ---
