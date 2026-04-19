@@ -23,7 +23,7 @@ class NumpyEncoder(json.JSONEncoder):
         return super(NumpyEncoder, self).default(obj)
 
 # --- 1. FULL PREMIUM UI ---
-st.set_page_config(page_title="Vector Victor AI | Pro Analytics", page_icon="🎾", layout="wide", initial_sidebar_state="collapsed")
+st.set_page_config(page_title="Vector Victor AI Skeletonkey", page_icon="🎾", layout="wide", initial_sidebar_state="collapsed")
 
 import plotly.graph_objects as go
 import plotly.express as px
