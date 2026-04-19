@@ -14,6 +14,7 @@ import subprocess
 import time
 from generate_brief import generate_brief
 import google.generativeai as genai
+from fpdf import FPDF
 
 class NumpyEncoder(json.JSONEncoder):
     def default(self, obj):
@@ -40,6 +41,78 @@ def generate_pro_report(brief_content):
         return response.text
     except Exception as e:
         return f"⚠️ AI Generation Error: {str(e)}"
+
+class PDFReport(FPDF):
+    def header(self):
+        # Set font
+        self.set_font('helvetica', 'B', 15)
+        # Title
+        self.set_text_color(0, 242, 254) # Neon Blue
+        self.cell(0, 10, 'Vector Victor AI: Biomechanical Analysis', border=False, align='C')
+        self.ln(10)
+        self.set_draw_color(0, 242, 254)
+        self.line(10, 20, 200, 20)
+        self.ln(5)
+
+    def footer(self):
+        # Position at 1.5 cm from bottom
+        self.set_y(-15)
+        # Set font
+        self.set_font('helvetica', 'I', 8)
+        self.set_text_color(128, 128, 128)
+        # Page number
+        self.cell(0, 10, f'Page {self.page_no()}/{{nb}} | Professional Biomechanics Engine', align='C')
+
+def create_pdf_report(text, sport_name):
+    pdf = PDFReport()
+    pdf.alias_nb_pages()
+    pdf.add_page()
+    
+    # Metadata Info
+    pdf.set_font('helvetica', 'B', 11)
+    pdf.set_text_color(0, 0, 0)
+    pdf.cell(0, 10, f"Sport: {sport_name}", ln=True)
+    pdf.set_font('helvetica', '', 9)
+    pdf.cell(0, 5, f"Analysis Date: {time.strftime('%Y-%m-%d %H:%M:%S')}", ln=True)
+    pdf.ln(5)
+
+    # Process text for basic formatting
+    lines = text.split('\n')
+    for line in lines:
+        line = line.strip()
+        if not line:
+            pdf.ln(2)
+            continue
+            
+        if line.startswith('### '):
+            pdf.set_font('helvetica', 'B', 12)
+            pdf.set_text_color(60, 60, 60)
+            pdf.multi_cell(0, 10, line.replace('### ', ''))
+        elif line.startswith('## '):
+            pdf.set_font('helvetica', 'B', 14)
+            pdf.set_text_color(0, 0, 0)
+            pdf.multi_cell(0, 12, line.replace('## ', ''))
+        elif line.startswith('* ') or line.startswith('- '):
+            pdf.set_font('helvetica', '', 10)
+            pdf.set_text_color(0, 0, 0)
+            pdf.write(7, "  • ")
+            pdf.multi_cell(0, 7, line[2:])
+        else:
+            pdf.set_font('helvetica', '', 10)
+            pdf.set_text_color(0, 0, 0)
+            # Basic Bold detection
+            if '**' in line:
+                parts = line.split('**')
+                for i, part in enumerate(parts):
+                    if i % 2 == 1: pdf.set_font('helvetica', 'B', 10)
+                    else: pdf.set_font('helvetica', '', 10)
+                    pdf.write(7, part)
+                pdf.ln(7)
+            else:
+                pdf.multi_cell(0, 7, line)
+                
+    # Use output(dest='S') to return as bytes string
+    return pdf.output()
 
 # --- 1. FULL PREMIUM UI ---
 st.set_page_config(page_title="Vector Victor AI Skeletonkey", page_icon="🎾", layout="wide", initial_sidebar_state="collapsed")
@@ -706,7 +779,16 @@ for i, (sport, actions) in enumerate(SPORT_CONFIG.items()):
                         status.update(label="Analysis Complete!", state="complete", expanded=True)
                         st.markdown("---")
                         st.markdown(report_text)
-                        st.download_button("📄 DOWNLOAD TEXT REPORT", report_text, f"{sport}_AI_Report.txt", width="stretch")
+                        
+                        # Generate the PDF
+                        pdf_file = create_pdf_report(report_text, sport)
+                        st.download_button(
+                            "📄 DOWNLOAD PROFESSIONAL PDF REPORT", 
+                            pdf_file, 
+                            f"{sport}_Pro_Analysis.pdf", 
+                            "application/pdf",
+                            width="stretch"
+                        )
 
                 # --- PRO ANALYTICS DASHBOARD ---
                 st.markdown("### 📊 PRO ANALYTICS DASHBOARD")
