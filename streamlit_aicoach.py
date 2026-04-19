@@ -15,6 +15,7 @@ import time
 from generate_brief import generate_brief
 import google.generativeai as genai
 from fpdf import FPDF
+from fpdf.enums import XPos, YPos
 
 class NumpyEncoder(json.JSONEncoder):
     def default(self, obj):
@@ -85,9 +86,9 @@ def create_pdf_report(text, sport_name):
     # Metadata Info
     pdf.set_font('helvetica', 'B', 11)
     pdf.set_text_color(0, 0, 0)
-    pdf.cell(0, 10, f"Sport: {clean_for_pdf(sport_name)}", ln=True)
+    pdf.cell(0, 10, f"Sport: {clean_for_pdf(sport_name)}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
     pdf.set_font('helvetica', '', 9)
-    pdf.cell(0, 5, f"Analysis Date: {time.strftime('%Y-%m-%d %H:%M:%S')}", ln=True)
+    pdf.cell(0, 5, f"Analysis Date: {time.strftime('%Y-%m-%d %H:%M:%S')}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
     pdf.ln(10)
 
     # Process text for basic formatting
