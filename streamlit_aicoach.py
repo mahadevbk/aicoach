@@ -559,7 +559,7 @@ def render_pro_stereo(p1, p2, h1, h2, f1, f2, fps):
 
 # --- 4. UI ---
 st.markdown("<h1>Vector Victor AI</h1>", unsafe_allow_html=True)
-st.markdown("<p class='hero-sub'>Professional Biomechanics AI</p>", unsafe_allow_html=True)
+st.markdown("<p class='hero-sub'>Deep form Vector and Bio mechanics AI engine</p>", unsafe_allow_html=True)
 
 SPORT_CONFIG = {
     "TENNIS 🎾": ["Serve", "Forehand", "Backhand"], "PADEL 🎾": ["Bandeja", "Vibora", "Smash"],
