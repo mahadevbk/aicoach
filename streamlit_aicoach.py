@@ -24,18 +24,23 @@ class NumpyEncoder(json.JSONEncoder):
         return super(NumpyEncoder, self).default(obj)
 
 def generate_pro_report(brief_content):
-    # 1. This is the "PROMPT" (The instructions/persona)
-    instructions = """
-    Act as a Senior Biomechanical Engineer. 
-    Use the following telemetry data to create a report exactly like the Claude example.
-    Include Tables, Phase Analysis, and specific Drills.
-    """
-    
-    # 2. You combine the Instructions + the Data (brief_content)
-    # This sends BOTH to Gemini at the same time.
-    response = model.generate_content([instructions, brief_content])
-    
-    return response.text
+    # Use a more explicit model name to resolve 'NotFound' exceptions
+    # Initialize inside the function to ensure thread-safety in Streamlit
+    try:
+        report_model = genai.GenerativeModel('models/gemini-1.5-flash')
+        
+        # 1. This is the "PROMPT" (The instructions/persona)
+        instructions = """
+        Act as a Senior Biomechanical Engineer. 
+        Use the following telemetry data to create a report exactly like the Claude example.
+        Include Tables, Phase Analysis, and specific Drills.
+        """
+        
+        # 2. You combine the Instructions + the Data (brief_content)
+        response = report_model.generate_content([instructions, brief_content])
+        return response.text
+    except Exception as e:
+        return f"⚠️ AI Generation Error: {str(e)}"
 
 # --- 1. FULL PREMIUM UI ---
 st.set_page_config(page_title="Vector Victor AI Skeletonkey", page_icon="🎾", layout="wide", initial_sidebar_state="collapsed")
@@ -45,7 +50,6 @@ import plotly.express as px
 
 # Setup
 genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-model = genai.GenerativeModel('gemini-1.5-flash')
 
 
 
