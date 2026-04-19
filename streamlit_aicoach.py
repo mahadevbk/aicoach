@@ -581,7 +581,7 @@ for i, (sport, actions) in enumerate(SPORT_CONFIG.items()):
         
         with c1:
             st.info(f"AI ENGINE: {sport}")
-            is_stereo = st.toggle("Stereographic Mode", value=True, key=f"st_{sport}")
+            is_stereo = st.toggle("Stereographic Mode", value=False, key=f"st_{sport}")
             u1 = st.file_uploader("Source 1", type=["mp4","mov"], key=f"u1_{sport}")
             u2 = st.file_uploader("Source 2", type=["mp4","mov"], key=f"u2_{sport}") if is_stereo else None
             sel_act = st.selectbox("Action", actions, key=f"act_{sport}")
