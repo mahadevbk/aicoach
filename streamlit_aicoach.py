@@ -157,6 +157,20 @@ st.markdown("""
     .stTabs [data-baseweb="tab"] { height: 50px; background: rgba(255, 255, 255, 0.05) !important; border-radius: 10px !important; border: 1px solid rgba(255,255,255,0.1) !important; padding: 0 15px !important; }
     .stTabs [aria-selected="true"] { background: rgba(204, 255, 0, 0.1) !important; border: 1px solid var(--neon-green) !important; }
     .stTabs [aria-selected="true"] p { color: var(--neon-green) !important; font-weight: 700 !important; }
+    
+    /* Premium Golden Button */
+    div.stButton > button:has(div:contains("GENERATE AI COACHING REPORT")) {
+        background: linear-gradient(135deg, #ffd700 0%, #daa520 50%, #b8860b 100%) !important;
+        color: #000 !important;
+        font-weight: 900 !important;
+        border: none !important;
+        box-shadow: 0 4px 15px rgba(184, 134, 11, 0.4) !important;
+        transition: all 0.3s ease !important;
+    }
+    div.stButton > button:has(div:contains("GENERATE AI COACHING REPORT")):hover {
+        transform: scale(1.02) !important;
+        box-shadow: 0 6px 20px rgba(255, 215, 0, 0.6) !important;
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -625,50 +639,63 @@ for i, (sport, actions) in enumerate(SPORT_CONFIG.items()):
         with c2:
             if res_key in st.session_state:
                 s = st.session_state[res_key]
-                if s['p2']: st.warning("⚠️ **STEREOGRAPHIC SYNC:** Use the sliders below to ensure both views are perfectly aligned on the **Impact Frame** before generating the pack.")
-                sl1 = st.slider("Source 1 Frame", 0, s['d1']['total']-1, s['d1']['impact'], key=f"sl1_{sport}")
-                sl2 = st.slider("Source 2 Frame", 0, (s['d2']['total']-1 if s['d2'] else 0), (s['d2']['impact'] if s['d2'] else 0), key=f"sl2_{sport}") if s['d2'] else 0
-                cap1 = cv2.VideoCapture(s['p1']); cap1.set(1, sl1); _, i1 = cap1.read(); cap1.release()
-                i1 = cv2.cvtColor(i1, cv2.COLOR_BGR2RGB)
-                if s['p2']:
-                    cap2 = cv2.VideoCapture(s['p2']); cap2.set(1, sl2); _, i2 = cap2.read(); cap2.release()
-                    i2 = cv2.cvtColor(i2, cv2.COLOR_BGR2RGB)
-                    h1, w1 = i1.shape[:2]
-                    h2, w2 = i2.shape[:2]
-                    h_target = int(min(h1, h2) * 0.5)
-                    w1_new, w2_new = int(w1 * (h_target / h1)), int(w2 * (h_target / h2))
-                    st.image(np.hstack((cv2.resize(i1, (w1_new, h_target)), cv2.resize(i2, (w2_new, h_target)))), width="stretch")
-                else:
-                    h, w = i1.shape[:2]
-                    st.image(cv2.resize(i1, (int(w*0.5), int(h*0.5))), width="stretch")
-                if st.button("🎬 GENERATE FINAL ANALYSIS PACK", key=f"gen_{sport}", width="stretch"):
-                    final_v = render_pro_stereo(s['p1'], s['p2'], s['d1']['history'], (s['d2']['history'] if s['d2'] else []), sl1, sl2, s['d1']['fps'])
-                    st.video(final_v)
-                    raw_interp = interpolate_landmarks(s['d1']['raw'])
-                    tele_opt = build_pro_telemetry(raw_interp, sport, sel_act, sl1, s['d1']['fps'], "dual" if s['p2'] else "lead")
-                    coaching_brief = generate_brief(tele_opt)
-                    st.session_state[f"brief_{sport}"] = coaching_brief
+                final_started_key = f"started_{sport}"
+                
+                # Only show sync controls if final processing hasn't started
+                if final_started_key not in st.session_state:
+                    if s['p2']: st.warning("⚠️ **STEREOGRAPHIC SYNC:** Use the sliders below to ensure both views are perfectly aligned on the **Impact Frame**.")
+                    sl1 = st.slider("Source 1 Frame", 0, s['d1']['total']-1, s['d1']['impact'], key=f"sl1_{sport}")
+                    sl2 = st.slider("Source 2 Frame", 0, (s['d2']['total']-1 if s['d2'] else 0), (s['d2']['impact'] if s['d2'] else 0), key=f"sl2_{sport}") if s['d2'] else 0
+                    
+                    cap1 = cv2.VideoCapture(s['p1']); cap1.set(1, sl1); _, i1 = cap1.read(); cap1.release()
+                    i1 = cv2.cvtColor(i1, cv2.COLOR_BGR2RGB)
+                    if s['p2']:
+                        cap2 = cv2.VideoCapture(s['p2']); cap2.set(1, sl2); _, i2 = cap2.read(); cap2.release()
+                        i2 = cv2.cvtColor(i2, cv2.COLOR_BGR2RGB)
+                        h1, w1 = i1.shape[:2]; h2, w2 = i2.shape[:2]
+                        h_target = int(min(h1, h2) * 0.5)
+                        w1_new, w2_new = int(w1 * (h_target / h1)), int(w2 * (h_target / h2))
+                        st.image(np.hstack((cv2.resize(i1, (w1_new, h_target)), cv2.resize(i2, (w2_new, h_target)))), width="stretch")
+                    else:
+                        h, w = i1.shape[:2]
+                        st.image(cv2.resize(i1, (int(w*0.5), int(h*0.5))), width="stretch")
+
+                    if st.button("🚀 START FINAL PROCESSING", key=f"gen_{sport}", width="stretch"):
+                        st.session_state[final_started_key] = True
+                        with st.spinner("Rendering final analysis video..."):
+                            final_v = render_pro_stereo(s['p1'], s['p2'], s['d1']['history'], (s['d2']['history'] if s['d2'] else []), sl1, sl2, s['d1']['fps'])
+                            st.session_state[f"video_{sport}"] = final_v
+                            raw_interp = interpolate_landmarks(s['d1']['raw'])
+                            tele_opt = build_pro_telemetry(raw_interp, sport, sel_act, sl1, s['d1']['fps'], "dual" if s['p2'] else "lead")
+                            st.session_state[f"brief_{sport}"] = generate_brief(tele_opt)
+                        st.rerun()
+
+                # Results Section
+                if final_started_key in st.session_state:
+                    st.video(st.session_state[f"video_{sport}"])
+                    
                     z_buf = io.BytesIO()
                     with zipfile.ZipFile(z_buf, "w") as zf:
-                        zf.write(final_v, "analysis.mp4")
-                        zf.writestr("SHARE_FILE_WITH_AI.txt", coaching_brief)
-                    st.download_button("📥 DOWNLOAD REPORT PACK", z_buf.getvalue(), f"{sport}_Report.zip", width="stretch")
-                if f"brief_{sport}" in st.session_state:
-                    st.markdown("---")
-                    st.info("💡 **Ready for AI Analysis:** Your biomechanical data has been synchronized. Click below to generate your professional coaching report.")
-                    if st.button("🤖 GENERATE AI COACHING REPORT", key=f"ai_{sport}", width="stretch"):
-                        coaching_brief = st.session_state[f"brief_{sport}"]
-                        with st.status("Vector Victor AI is analyzing your biomechanics...") as status:
-                            report_text = generate_pro_report(coaching_brief)
-                            if "⚠️" in report_text:
-                                status.update(label="Analysis Failed", state="error", expanded=True)
-                                st.error(report_text)
-                            else:
-                                status.update(label="Analysis Complete!", state="complete", expanded=True)
-                                st.markdown("---")
-                                st.markdown(report_text)
-                                docx_file = create_docx_report(report_text, sport)
-                                st.download_button("📄 DOWNLOAD RICH REPORT (WORD)", docx_file, f"{sport}_Pro_Analysis.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", width="stretch")
+                        zf.write(st.session_state[f"video_{sport}"], "analysis.mp4")
+                        zf.writestr("SHARE_FILE_WITH_AI.txt", st.session_state[f"brief_{sport}"])
+                    
+                    st.download_button("📥 DOWNLOAD VIDEO & AI BRIEF", z_buf.getvalue(), f"{sport}_Report.zip", width="stretch")
+
+                    if f"brief_{sport}" in st.session_state:
+                        st.markdown("---")
+                        if st.button("🤖 GENERATE AI COACHING REPORT", key=f"ai_{sport}", width="stretch"):
+                            coaching_brief = st.session_state[f"brief_{sport}"]
+                            with st.status("Vector Victor AI is analyzing your biomechanics...") as status:
+                                report_text = generate_pro_report(coaching_brief)
+                                if "⚠️" in report_text:
+                                    status.update(label="Analysis Failed", state="error", expanded=True)
+                                    st.error(report_text)
+                                else:
+                                    status.update(label="Analysis Complete!", state="complete", expanded=True)
+                                    st.markdown("---")
+                                    st.markdown(report_text)
+                                    docx_file = create_docx_report(report_text, sport)
+                                    st.download_button("📄 DOWNLOAD RICH REPORT (WORD)", docx_file, f"{sport}_Pro_Analysis.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", width="stretch")
                 st.markdown("### 📊 PRO ANALYTICS DASHBOARD")
                 metrics = get_ai_metrics(s['d1']['raw'], s['d1']['fps'])
                 if metrics:
