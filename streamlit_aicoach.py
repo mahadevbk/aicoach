@@ -30,6 +30,7 @@ import plotly.express as px
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Roboto+Flex:wght@100..1000&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Bitcount+Prop+Single&display=swap');
     :root {
         --neon-green: #ccff00;
         --matrix-green: #00FF41;
@@ -78,8 +79,9 @@ st.markdown("""
         transform: scale(1.02);
     }
 
-    h1 { font-size: clamp(2rem, 8vw, 4rem) !important; font-weight: 900 !important; background: linear-gradient(to right, #2dd4bf, #38bdf8); -webkit-background-clip: text; -webkit-text-fill-color: transparent; text-align: center; margin-bottom: 0px !important; filter: drop-shadow(2px 2px 1px #dfff4f); }
-    .hero-sub { text-align: center; color: #94a3b8; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 4px; margin-bottom: 3rem; }
+    h1 { font-family: 'Bitcount Prop Single', sans-serif !important; font-size: clamp(2rem, 8vw, 4rem) !important; font-weight: 900 !important; background: linear-gradient(to right, #ccff00, #38bdf8); -webkit-background-clip: text; -webkit-text-fill-color: transparent; text-align: center; margin-bottom: 0px !important; filter: drop-shadow(3px 3px 0px #ffffff); }
+    .hero-sub { font-family: 'Bitcount Prop Single', sans-serif !important; text-align: center; color: #94a3b8; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 4px; margin-bottom: 3rem; }
+
     
     .stTabs [data-baseweb="tab-list"] { gap: 8px; justify-content: center; flex-wrap: wrap; }
     .stTabs [data-baseweb="tab"] { height: 50px; background: rgba(255, 255, 255, 0.05) !important; border-radius: 10px !important; border: 1px solid rgba(255,255,255,0.1) !important; padding: 0 15px !important; }
