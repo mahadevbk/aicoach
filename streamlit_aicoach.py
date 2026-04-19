@@ -52,37 +52,75 @@ def generate_pro_report(brief_content):
 def create_docx_report(text, sport_name):
     doc = Document()
     
-    # Process text line by line to create a structured Word Doc
+    # Global Styles
+    style = doc.styles['Normal']
+    style.font.name = 'Arial'
+    style.font.size = Pt(11)
+    
+    # Title
+    header = doc.add_heading("VECTOR VICTOR AI", 0)
+    header.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    subtitle = doc.add_paragraph("BIO MECHANICAL ANALYSIS REPORT")
+    subtitle.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    subtitle.runs[0].bold = True
+    
+    doc.add_paragraph(f"Sport: {sport_name} | Date: {time.strftime('%Y-%m-%d')}")
+    doc.add_paragraph("_" * 50)
+
+    # State machine for table parsing
     lines = text.split('\n')
+    table_data = []
+    in_table = False
+
     for line in lines:
-        line = line.strip()
-        if not line:
-            doc.add_paragraph()
+        clean_line = line.strip()
+        
+        # Table Detection
+        if '|' in clean_line:
+            if '---' in clean_line: # Skip separator lines
+                continue
+            cells = [c.strip() for c in clean_line.split('|') if c.strip()]
+            if cells:
+                table_data.append(cells)
+                in_table = True
+            continue
+        else:
+            if in_table and table_data:
+                # Flush the table to the document
+                doc_table = doc.add_table(rows=len(table_data), cols=len(table_data[0]))
+                doc_table.style = 'Table Grid'
+                for r_idx, row in enumerate(table_data):
+                    for c_idx, val in enumerate(row):
+                        if c_idx < len(doc_table.columns):
+                            doc_table.cell(r_idx, c_idx).text = val
+                doc.add_paragraph() # Add space after table
+                table_data = []
+                in_table = False
+
+        if not clean_line:
             continue
             
-        # Detect Headings
-        if line.startswith('# '):
-            p = doc.add_heading(line.replace('# ', ''), level=0)
-            p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        elif line.startswith('## '):
-            doc.add_heading(line.replace('## ', ''), level=1)
-        elif line.startswith('### '):
-            doc.add_heading(line.replace('### ', ''), level=2)
-        elif line.startswith('* ') or line.startswith('- '):
-            doc.add_paragraph(line[2:], style='List Bullet')
-        elif '|' in line and '---' not in line:
-            # Simple text-based table row
-            doc.add_paragraph(line)
+        # Headings
+        if clean_line.startswith('# '):
+            doc.add_heading(clean_line.replace('# ', ''), level=0)
+        elif clean_line.startswith('## '):
+            doc.add_heading(clean_line.replace('## ', ''), level=1)
+        elif clean_line.startswith('### '):
+            doc.add_heading(clean_line.replace('### ', ''), level=2)
+        elif clean_line.startswith('* ') or clean_line.startswith('- '):
+            p = doc.add_paragraph(clean_line[2:], style='List Bullet')
+            p.paragraph_format.space_after = Pt(6)
         else:
             p = doc.add_paragraph()
-            # Handle Bold **text**
-            if '**' in line:
-                parts = line.split('**')
+            p.paragraph_format.space_after = Pt(10)
+            # Bold parsing
+            if '**' in clean_line:
+                parts = clean_line.split('**')
                 for i, part in enumerate(parts):
                     run = p.add_run(part)
                     if i % 2 == 1: run.bold = True
             else:
-                p.add_run(line)
+                p.add_run(clean_line)
                 
     bio = io.BytesIO()
     doc.save(bio)
