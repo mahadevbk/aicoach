@@ -17,6 +17,8 @@ import google.generativeai as genai
 from docx import Document
 from docx.shared import Pt, RGBColor
 from docx.enum.text import WD_ALIGN_PARAGRAPH
+from fpdf import FPDF
+from fpdf.enums import XPos, YPos
 
 class NumpyEncoder(json.JSONEncoder):
     def default(self, obj):
@@ -55,15 +57,23 @@ def create_docx_report(text, sport_name):
     
     # Global Styles
     style = doc.styles['Normal']
-    style.font.name = 'Arial'
+    style.font.name = 'Bitcount Prop Single'
     style.font.size = Pt(11)
     
     # Title
     header = doc.add_heading("VECTOR VICTOR AI", 0)
     header.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    if header.runs:
+        header.runs[0].font.name = 'Bitcount Prop Single'
+        header.runs[0].bold = False
+        header.runs[0].font.size = Pt(26)
+    
     subtitle = doc.add_paragraph("BIO MECHANICAL ANALYSIS REPORT")
     subtitle.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    subtitle.runs[0].bold = True
+    if subtitle.runs:
+        subtitle.runs[0].font.name = 'Bitcount Prop Single'
+        subtitle.runs[0].bold = True
+        subtitle.runs[0].font.size = Pt(14)
     
     doc.add_paragraph(f"Sport: {sport_name} | Date: {time.strftime('%Y-%m-%d')}")
     doc.add_paragraph("_" * 50)
@@ -126,6 +136,105 @@ def create_docx_report(text, sport_name):
     bio = io.BytesIO()
     doc.save(bio)
     return bio.getvalue()
+
+class PDFReport(FPDF):
+    def header(self):
+        self.set_font('helvetica', 'B', 16)
+        self.set_text_color(0, 180, 255) # Professional Blue
+        self.cell(0, 10, 'VECTOR VICTOR AI', border=False, align='C', new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        self.set_font('helvetica', 'B', 10)
+        self.set_text_color(100, 100, 100)
+        self.cell(0, 5, 'BIO MECHANICAL ANALYSIS REPORT', border=False, align='C', new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        self.ln(5)
+        self.set_draw_color(0, 180, 255)
+        self.line(10, 30, 200, 30)
+        self.ln(10)
+
+    def footer(self):
+        self.set_y(-15)
+        self.set_font('helvetica', 'I', 8)
+        self.set_text_color(128, 128, 128)
+        self.cell(0, 10, f'Page {self.page_no()}/{{nb}} | Vector Victor Biomechanics Engine', align='C')
+
+def create_pdf_report(text, sport_name):
+    def clean_for_pdf(s):
+        try:
+            return s.encode('latin-1', 'replace').decode('latin-1').replace('?', '')
+        except:
+            return "".join([c for c in s if ord(c) < 128])
+
+    pdf = PDFReport()
+    pdf.alias_nb_pages()
+    pdf.add_page()
+    
+    # Metadata
+    pdf.set_font('helvetica', 'B', 11)
+    pdf.set_text_color(0, 0, 0)
+    pdf.cell(0, 8, f"Sport: {clean_for_pdf(sport_name)}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+    pdf.set_font('helvetica', '', 9)
+    pdf.cell(0, 5, f"Date: {time.strftime('%Y-%m-%d %H:%M:%S')}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+    pdf.ln(5)
+
+    lines = text.split('\n')
+    table_data = []
+    in_table = False
+
+    for line in lines:
+        clean_line = clean_for_pdf(line.strip())
+        
+        # Table Logic
+        if '|' in clean_line:
+            if '---' in clean_line: continue
+            cells = [c.strip() for c in clean_line.split('|') if c.strip()]
+            if cells:
+                table_data.append(cells)
+                in_table = True
+            continue
+        else:
+            if in_table and table_data:
+                # Render PDF Table
+                pdf.set_font('helvetica', 'B', 9)
+                col_width = (pdf.w - 20) / len(table_data[0])
+                for r_idx, row in enumerate(table_data):
+                    if r_idx > 0: pdf.set_font('helvetica', '', 9)
+                    for val in row:
+                        pdf.cell(col_width, 8, val, border=1)
+                    pdf.ln(8)
+                pdf.ln(5)
+                table_data = []
+                in_table = False
+
+        if not clean_line:
+            pdf.ln(2)
+            continue
+
+        pdf.set_x(10)
+        if clean_line.startswith('### '):
+            pdf.set_font('helvetica', 'B', 11)
+            pdf.set_text_color(80, 80, 80)
+            pdf.multi_cell(0, 8, clean_line.replace('### ', ''), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        elif clean_line.startswith('## '):
+            pdf.set_font('helvetica', 'B', 13)
+            pdf.set_text_color(0, 0, 0)
+            pdf.multi_cell(0, 10, clean_line.replace('## ', ''), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        elif clean_line.startswith('* ') or clean_line.startswith('- '):
+            pdf.set_font('helvetica', '', 10)
+            pdf.set_text_color(0, 0, 0)
+            pdf.multi_cell(0, 6, f"  - {clean_line[2:]}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        else:
+            pdf.set_font('helvetica', '', 10)
+            pdf.set_text_color(0, 0, 0)
+            if '**' in clean_line:
+                parts = clean_line.split('**')
+                for idx_p, part in enumerate(parts):
+                    if idx_p % 2 == 1: pdf.set_font('helvetica', 'B', 10)
+                    else: pdf.set_font('helvetica', '', 10)
+                    pdf.write(6, part)
+                pdf.ln(6)
+            else:
+                pdf.multi_cell(0, 6, clean_line, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+
+    return bytes(pdf.output())
 
 # --- 1. FULL PREMIUM UI ---
 st.set_page_config(page_title="Vector Victor AI Skeletonkey", page_icon="🎾", layout="wide", initial_sidebar_state="collapsed")
@@ -735,6 +844,14 @@ for i, (sport, actions) in enumerate(SPORT_CONFIG.items()):
                                     st.markdown(report_text)
                                     docx_file = create_docx_report(report_text, sport)
                                     st.download_button("📄 DOWNLOAD RICH REPORT (WORD)", docx_file, f"{sport}_Pro_Analysis.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", width="stretch")
+
+                                    # Pro PDF Download
+                                    try:
+                                        pdf_file = create_pdf_report(report_text, sport)
+                                        st.download_button("📜 DOWNLOAD PROFESSIONAL PDF REPORT", pdf_file, f"{sport}_Pro_Analysis.pdf", "application/pdf", width="stretch")
+                                    except Exception as pdf_err:
+                                        st.error(f"❌ PDF Rendering Issue: {str(pdf_err)}")
+
                 st.markdown("### 📊 PRO ANALYTICS DASHBOARD")
                 metrics = get_ai_metrics(s['d1']['raw'], s['d1']['fps'])
                 if metrics:
