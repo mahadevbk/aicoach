@@ -2,7 +2,7 @@
 
 ### Professional Biomechanics & Sports Analytics Engine
 
-Vector Victor AI (formerly Not Coach Nikki) is a high-end sports biomechanics dashboard powered by MediaPipe Pose. It provides elite-level analytics for:
+Vector Victor AI  is a high-end sports biomechanics dashboard powered by MediaPipe Pose. It provides elite-level analytics for:
 - **Tennis & Racket Sports:** Kinetic chain sequencing and power curves.
 - **Golf:** X-Factor separation and rotation velocity.
 - **Gym:** Squat depth tracking and vertical bar-path analysis.
