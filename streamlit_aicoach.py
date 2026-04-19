@@ -13,6 +13,7 @@ import urllib.request
 import subprocess
 import time
 from generate_brief import generate_brief
+import google.generativeai as genai
 
 class NumpyEncoder(json.JSONEncoder):
     def default(self, obj):
@@ -22,11 +23,31 @@ class NumpyEncoder(json.JSONEncoder):
         if isinstance(obj, np.bool_): return bool(obj)
         return super(NumpyEncoder, self).default(obj)
 
+def generate_pro_report(brief_content):
+    # 1. This is the "PROMPT" (The instructions/persona)
+    instructions = """
+    Act as a Senior Biomechanical Engineer. 
+    Use the following telemetry data to create a report exactly like the Claude example.
+    Include Tables, Phase Analysis, and specific Drills.
+    """
+    
+    # 2. You combine the Instructions + the Data (brief_content)
+    # This sends BOTH to Gemini at the same time.
+    response = model.generate_content([instructions, brief_content])
+    
+    return response.text
+
 # --- 1. FULL PREMIUM UI ---
 st.set_page_config(page_title="Vector Victor AI Skeletonkey", page_icon="🎾", layout="wide", initial_sidebar_state="collapsed")
 
 import plotly.graph_objects as go
 import plotly.express as px
+
+# Setup
+genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+model = genai.GenerativeModel('gemini-1.5-flash')
+
+
 
 st.markdown("""
     <style>
@@ -666,6 +687,22 @@ for i, (sport, actions) in enumerate(SPORT_CONFIG.items()):
                         zf.write(final_v, "analysis.mp4")
                         zf.writestr("SHARE_FILE_WITH_AI.txt", coaching_brief)
                     st.download_button("📥 DOWNLOAD REPORT PACK", z_buf.getvalue(), f"{sport}_Report.zip", width="stretch")
+
+                if st.button("🤖 GENERATE AI COACHING REPORT", key=f"ai_{sport}", width="stretch"):
+                    # New Pro Telemetry for AI
+                    raw_interp = interpolate_landmarks(s['d1']['raw'])
+                    tele_opt = build_pro_telemetry(
+                        raw_interp, sport, sel_act, sl1, 
+                        s['d1']['fps'], "dual" if s['p2'] else "lead"
+                    )
+                    coaching_brief = generate_brief(tele_opt)
+                    
+                    with st.status("Vector Victor AI is analyzing your biomechanics...") as status:
+                        report_text = generate_pro_report(coaching_brief)
+                        status.update(label="Analysis Complete!", state="complete", expanded=True)
+                        st.markdown("---")
+                        st.markdown(report_text)
+                        st.download_button("📄 DOWNLOAD TEXT REPORT", report_text, f"{sport}_AI_Report.txt", width="stretch")
 
                 # --- PRO ANALYTICS DASHBOARD ---
                 st.markdown("### 📊 PRO ANALYTICS DASHBOARD")
