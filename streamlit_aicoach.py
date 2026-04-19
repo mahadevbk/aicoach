@@ -30,7 +30,8 @@ def generate_pro_report(brief_content):
     # Auto-discover the best available model to avoid 404/NotFound errors
     try:
         supported_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-        priority = ['models/gemini-1.5-flash', 'models/gemini-1.5-flash-latest', 'models/gemini-pro']
+        #priority = ['models/gemini-1.5-flash', 'models/gemini-1.5-flash-latest', 'models/gemini-pro']
+        priority = ['models/gemini-1.5-pro', 'models/gemini-1.5-flash']
         selected_model = next((p for p in priority if p in supported_models), supported_models[0] if supported_models else None)
             
         if not selected_model:
