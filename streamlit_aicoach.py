@@ -885,7 +885,7 @@ for i, (sport, actions) in enumerate(SPORT_CONFIG.items()):
                     kpis = generate_sport_kpis(metrics, sport, s['d1']['raw'])
                     insights = get_actionable_insights(kpis, sport)
                     m1, m2, m3 = st.columns(3)
-                    with m1: draw_modern_metric("Max Velocity", f"{max(metrics['wrist_speed']):.1f}m/s", "+12%", "⚡")
+                    with m1: draw_modern_metric("Max Velocity", f"{max([v for v in metrics['wrist_speed'] if v is not None] or [0]):.1f}m/s", "+12%", "⚡")
                     with m2:
                         if sport == "GYM 🏋️": draw_modern_metric("Squat Depth", f"{kpis.get('depth_ratio', 0):.2f}", "-5%", "📏")
                         elif sport == "GOLF ⛳": draw_modern_metric("X-Factor", f"{kpis.get('max_x_factor', 0):.1f}°", "+8%", "🔄")
