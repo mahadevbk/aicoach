@@ -273,19 +273,9 @@ st.markdown("""
         text-transform: uppercase !important;
     }
 
-    /* Revert File Uploader to Defaults to fix overlap */
-    [data-testid="stFileUploader"], [data-testid="stFileUploader"] * {
-        font-family: sans-serif !important;
+    /* Standardise File Uploader - Keep Font, Fix Overlap by disabling uppercase */
+    [data-testid="stFileUploader"] * {
         text-transform: none !important;
-    }
-    [data-testid="stFileUploader"] button {
-        min-height: unset !important;
-        height: auto !important;
-        line-height: normal !important;
-        width: auto !important;
-    }
-    [data-testid="stFileUploader"] section {
-        padding: 0 !important;
     }
     
     .stApp { background: radial-gradient(circle at top right, #0f172a, #020617); color: #f8fafc; }
