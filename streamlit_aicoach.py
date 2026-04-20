@@ -1033,6 +1033,16 @@ with tab3:
             elif chart_view == "RADAR CHART": st.plotly_chart(plot_radar_chart(metrics), use_container_width=True)
             else: st.plotly_chart(plot_kinetic_chain(metrics), use_container_width=True)
             
+            # --- DOWNLOADS & EXPORTS ---
+            st.markdown("#### DOWNLOADS & EXPORT")
+            
+            # ZIP Download (Always available after render)
+            z_buf = io.BytesIO()
+            with zipfile.ZipFile(z_buf, "w") as zf:
+                zf.write(st.session_state["final_video"], "analysis.mp4")
+                zf.writestr("AI_BRIEF.txt", st.session_state["brief"])
+            st.download_button("📥 DOWNLOAD ZIP (VIDEO + DATA)", z_buf.getvalue(), f"{sport}_DATA.zip", use_container_width=True)
+            
             st.markdown("---")
             if st.button("🤖 GENERATE AI COACHING REPORT", type="primary", use_container_width=True):
                 with st.status("AI IS ANALYZING...") as status:
@@ -1042,8 +1052,7 @@ with tab3:
             
             if "report_text" in st.session_state:
                 st.markdown(st.session_state["report_text"])
-                
-                st.markdown("#### EXPORT & SHARE")
+                st.markdown("#### EXPORT DOCUMENTS")
                 c1, c2 = st.columns(2)
                 with c1:
                     docx_f = create_docx_report(st.session_state["report_text"], sport)
@@ -1051,12 +1060,6 @@ with tab3:
                 with c2:
                     pdf_f = create_pdf_report(st.session_state["report_text"], sport)
                     st.download_button("📜 PDF REPORT", pdf_f, f"{sport}_ANALYSIS.pdf", use_container_width=True)
-                
-                z_buf = io.BytesIO()
-                with zipfile.ZipFile(z_buf, "w") as zf:
-                    zf.write(st.session_state["final_video"], "analysis.mp4")
-                    zf.writestr("AI_BRIEF.txt", st.session_state["brief"])
-                st.download_button("📥 DOWNLOAD ZIP (VIDEO + DATA)", z_buf.getvalue(), f"{sport}_DATA.zip", use_container_width=True)
 
         if st.button("↺ ANALYZE ANOTHER VIDEO", use_container_width=True):
             for key in list(st.session_state.keys()): del st.session_state[key]
