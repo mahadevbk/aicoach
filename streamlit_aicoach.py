@@ -262,73 +262,51 @@ st.markdown("""
         --glass-bg: rgba(255, 255, 255, 0.05);
         --glass-border: rgba(255, 255, 255, 0.1);
     }
-    /* Global Font Override */
-    .stApp, .stApp *, button, input, select, textarea, .stTabs [data-baseweb="tab"] p { 
-        font-family: 'Bitcount Prop Single', sans-serif !important; 
-    }
-    .stApp { background: radial-gradient(circle at top right, #0f172a, #020617); color: #f8fafc; }
     
+    /* Global Font & Uppercase Override */
+    .stApp, .stApp *, button, label, input, select, textarea, .stTabs [data-baseweb="tab"] p, .uploadedFile { 
+        font-family: 'Bitcount Prop Single', sans-serif !important; 
+        text-transform: uppercase !important;
+    }
+    
+    .stApp { background: radial-gradient(circle at top right, #0f172a, #020617); color: #f8fafc; }
     .main { padding: 1rem 0.5rem; }
     
+    /* Button Styling */
     button { 
-        width: 100% !important;
         min-height: 48px !important;
         font-size: 14px !important;
     }
-    
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 0.5rem;
-        display: flex;
-        flex-wrap: wrap;
-        justify-content: center;
-    }
-    
+    .stButton > button { width: 100% !important; }
+
+    /* Tabs Styling */
+    .stTabs [data-baseweb="tab-list"] { gap: 0.5rem; display: flex; flex-wrap: wrap; justify-content: center; }
     .stTabs [data-baseweb="tab"] {
-        flex: 1;
-        min-width: 80px;
-        text-align: center;
-        height: 50px; 
-        background: rgba(255, 255, 255, 0.05) !important; 
-        border-radius: 10px !important; 
+        flex: 1; min-width: 80px; text-align: center; height: 50px; 
+        background: rgba(255, 255, 255, 0.05) !important; border-radius: 10px !important; 
         border: 1px solid rgba(255,255,255,0.1) !important;
     }
     .stTabs [aria-selected="true"] { background: rgba(204, 255, 0, 0.1) !important; border: 1px solid var(--neon-green) !important; }
     .stTabs [aria-selected="true"] p { color: var(--neon-green) !important; font-weight: 700 !important; }
 
+    /* Slider & Column Styling */
     .stSlider { padding: 1rem 0; }
     [data-testid="column"] { padding: 0 0.25rem; }
-
-    div[data-testid="stSlider"] label p { color: var(--neon-green) !important; font-weight: 900 !important; font-size: 1.1rem !important; text-transform: uppercase; letter-spacing: 1px; }
+    div[data-testid="stSlider"] label p { color: var(--neon-green) !important; font-weight: 900 !important; font-size: 1rem !important; letter-spacing: 1px; }
     div[data-testid="stThumbValue"] { color: #000 !important; background-color: var(--neon-green) !important; font-weight: 900 !important; }
     div[data-baseweb="slider"] > div { background: var(--neon-green) !important; }
     
-    .glass-card { 
-        background: var(--glass-bg); 
-        backdrop-filter: blur(12px); 
-        border: 1px solid var(--glass-border); 
-        border-radius: 24px; 
-        padding: 1.5rem; 
-        margin-bottom: 2rem; 
-    }
+    /* Card Styling */
+    .glass-card { background: var(--glass-bg); backdrop-filter: blur(12px); border: 1px solid var(--glass-border); border-radius: 24px; padding: 1.5rem; margin-bottom: 2rem; }
+    .bento-card { background: rgba(255, 255, 255, 0.03); border: 1px solid var(--glass-border); border-radius: 20px; padding: 20px; text-align: center; margin-bottom: 10px; }
 
-    .bento-card {
-        background: rgba(255, 255, 255, 0.03);
-        border: 1px solid var(--glass-border);
-        border-radius: 20px;
-        padding: 20px;
-        text-align: center;
-        margin-bottom: 10px;
-    }
+    /* Heading Styling */
+    h1 { font-size: clamp(2rem, 8vw, 4rem) !important; font-weight: normal !important; background: linear-gradient(to right, #00f2fe, #4facfe); -webkit-background-clip: text; -webkit-text-fill-color: transparent; text-align: center; margin-bottom: 0px !important; text-transform: uppercase !important; }
+    h4 { font-size: 0.85rem !important; font-weight: 700 !important; color: var(--neon-green); margin-top: 2.5rem !important; margin-bottom: 0.5rem !important; letter-spacing: 2px; }
+    .hero-sub { text-align: center; color: #94a3b8; font-size: 0.7rem; letter-spacing: 4px; margin-bottom: 2rem; }
 
-    h1 { font-size: clamp(2rem, 8vw, 4rem) !important; font-weight: normal !important; background: linear-gradient(to right, #00f2fe, #4facfe); -webkit-background-clip: text; -webkit-text-fill-color: transparent; text-align: center; margin-bottom: 0px !important; }
-    h4 { font-size: 1.2rem !important; font-weight: 700 !important; color: var(--neon-green); text-transform: uppercase; margin-top: 1.5rem !important; margin-bottom: 1rem !important; }
-    .hero-sub { text-align: center; color: #94a3b8; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 4px; margin-bottom: 2rem; }
-
-    div.stButton > button:has(div:contains("GENERATE AI COACHING REPORT")) {
-        background: linear-gradient(135deg, #ffd700 0%, #daa520 50%, #b8860b 100%) !important;
-        color: #000 !important;
-        font-weight: 900 !important;
-    }
+    /* Specific Button Highlighting */
+    div.stButton > button:has(div:contains("GENERATE AI COACHING REPORT")) { background: linear-gradient(135deg, #ffd700 0%, #daa520 50%, #b8860b 100%) !important; color: #000 !important; font-weight: 900 !important; }
     </style>
     """, unsafe_allow_html=True)
 
