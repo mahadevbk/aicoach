@@ -1128,7 +1128,7 @@ st.markdown("""
     /* Heading Styling */
     h1 { font-size: clamp(1.5rem, 6vw, 3rem) !important; font-weight: normal !important; background: linear-gradient(to right, #00f2fe, #ff00ff); -webkit-background-clip: text; -webkit-text-fill-color: transparent; text-align: center; margin-bottom: 0px !important; text-transform: uppercase !important; }
     h4 { font-size: 0.85rem !important; font-weight: 700 !important; color: var(--neon-green); margin-top: 2.5rem !important; margin-bottom: 0.5rem !important; letter-spacing: 2px; }
-    .hero-sub { text-align: center; color: #94a3b8; font-size: 0.525rem; letter-spacing: 4px; margin-bottom: 2rem; }
+    .hero-sub { text-align: center; color: #94a3b8; font-size: 0.39375rem; letter-spacing: 4px; margin-bottom: 2rem; }
 
     /* Specific Button Highlighting */
     div.stButton > button:has(div:contains("GENERATE AI COACHING REPORT")) { background: linear-gradient(135deg, #ffd700 0%, #daa520 50%, #b8860b 100%) !important; color: #000 !important; font-weight: 900 !important; }
