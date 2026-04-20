@@ -747,13 +747,13 @@ def render_pro_stereo(p1, p2, h1, h2, f1, f2, fps):
     for i in range(len(h1)):
         ret1, f1_img = cap1.read()
         if not ret1: break
-        if h1[i]: draw_neon_skeleton(f1_img, h1[i])
+        if h1[i]: draw_neon_skeleton(f1_img, h1[i], alpha=0.15)
         frame_to_write = cv2.resize(f1_img, (w1, target_h))
         if p2:
             idx2 = i - off
             if 0 <= idx2 < len(h2):
                 cap2.set(1, idx2); _, f2_img = cap2.read()
-                if h2[idx2]: draw_neon_skeleton(f2_img, h2[idx2])
+                if h2[idx2]: draw_neon_skeleton(f2_img, h2[idx2], alpha=0.15)
                 f2_img = cv2.resize(f2_img, (w2, target_h))
             else: f2_img = np.zeros((target_h, w2, 3), dtype=np.uint8)
             frame_to_write = np.hstack((frame_to_write, f2_img))
