@@ -264,9 +264,18 @@ st.markdown("""
     }
     
     /* Global Font & Uppercase Override */
-    .stApp, .stApp *, button, label, input, select, textarea, .stTabs [data-baseweb="tab"] p, .uploadedFile { 
+    .stApp, button, label, input, select, textarea, .stTabs [data-baseweb="tab"] p { 
         font-family: 'Bitcount Prop Single', sans-serif !important; 
         text-transform: uppercase !important;
+    }
+
+    /* Specifically fix the Upload Button text overlap */
+    [data-testid="stFileUploader"] section button div {
+        text-transform: none !important;
+    }
+    
+    [data-testid="stFileUploader"] label {
+        text-transform: none !important;
     }
     
     .stApp { background: radial-gradient(circle at top right, #0f172a, #020617); color: #f8fafc; }
