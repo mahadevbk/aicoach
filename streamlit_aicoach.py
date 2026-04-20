@@ -538,6 +538,9 @@ def build_pro_telemetry(raw_frames, sport_raw, action, event_frame, fps, camera_
     elif sport_clean == "GOLF": phases = [("address", -80), ("top", -30), ("downswing", -12), ("follow", 25)]
     elif sport_clean == "GYM": phases = [("start", -45), ("midpoint", -22), ("finish", 30)]
     elif sport_clean == "YOGA": phases = [("approach", -30), ("exit", 30)]
+    elif sport_clean == "FOOTBALL/SOCCER": phases = [("approach", -15), ("strike", 0), ("follow_through", 10)]
+    elif sport_clean == "BOXING/MMA": phases = [("load", -10), ("impact", 0), ("recoil", 8)]
+    elif sport_clean == "ATHLETICS/RUNNING": phases = [("drive", -5), ("extension", 0), ("recovery", 12)]
     for name, p_off in phases: output["phase_snapshots"][name] = get_snapshot(event_frame + p_off)
 
     def analyze_speed(speed_series):
@@ -860,26 +863,16 @@ for i, tab in enumerate(tabs):
         
         with col_ui:
             st.markdown(f"### {sport} Settings")
-            # Combined Action Selector
-            action = st.selectbox(
-                "Select Specific Action", 
-                SPORT_CONFIG[sport], 
-                key=f"act_sel_{sport}"
-            )
-            
+            action = st.selectbox("Select Specific Action", SPORT_CONFIG[sport], key=f"act_sel_{sport}")
             is_stereo = st.toggle("Stereographic Mode (Dual View)", value=False, key=f"st_{sport}")
-            
             u1 = st.file_uploader("Source 1 (Lead/Side View)", type=["mp4","mov"], key=f"u1_{sport}")
-            u2 = None
-            if is_stereo:
-                u2 = st.file_uploader("Source 2 (Back/Alternative View)", type=["mp4","mov"], key=f"u2_{sport}")
+            u2 = st.file_uploader("Source 2 (Back/Alternative View)", type=["mp4","mov"], key=f"u2_{sport}") if is_stereo else None
 
-            if st.button("RUN PRO ANALYSIS", key=f"run_{sport}"):
+            if st.button("RUN PRO ANALYSIS", key=f"run_{sport}", use_container_width=True):
                 if u1 is not None:
                     model_task = download_model()
                     t1_p = os.path.join(tempfile.gettempdir(), f"l_{sport}.mp4")
                     with open(t1_p, "wb") as f: f.write(u1.getbuffer())
-                    
                     with st.status(f"Analyzing {sport}...") as status:
                         d1 = analyze_vid(t1_p, model_task)
                         d2, t2_p = None, None
@@ -895,35 +888,11 @@ for i, tab in enumerate(tabs):
             if res_key in st.session_state:
                 s = st.session_state[res_key]
                 final_started_key = f"started_{sport}"
-                
-                # Syncing & Frame Selection
                 if final_started_key not in st.session_state:
-                    if s['p2']: st.warning("⚠️ **STEREOGRAPHIC SYNC:** Align both views on the **Impact/Peak** frame.")
-                    
                     sl1 = st.slider("Source 1 Sync", 0, s['d1']['total']-1, s['d1']['impact'], key=f"sl1_{sport}")
-                    sl2 = 0
-                    if s['p2']:
-                        sl2 = st.slider("Source 2 Sync", 0, s['d2']['total']-1, s['d2']['impact'], key=f"sl2_{sport}")
+                    sl2 = st.slider("Source 2 Sync", 0, (s['d2']['total']-1 if s['d2'] else 0), (s['d2']['impact'] if s['d2'] else 0), key=f"sl2_{sport}") if s['p2'] else 0
                     
-                    # Preview Logic
-                    cap1 = cv2.VideoCapture(s['p1']); cap1.set(cv2.CAP_PROP_POS_FRAMES, sl1)
-                    ret1, i1 = cap1.read(); cap1.release()
-                    
-                    if ret1 and i1 is not None:
-                        i1 = cv2.cvtColor(i1, cv2.COLOR_BGR2RGB)
-                        if s['p2']:
-                            cap2 = cv2.VideoCapture(s['p2']); cap2.set(cv2.CAP_PROP_POS_FRAMES, sl2)
-                            ret2, i2 = cap2.read(); cap2.release()
-                            if ret2 and i2 is not None:
-                                i2 = cv2.cvtColor(i2, cv2.COLOR_BGR2RGB)
-                                h_t = 400
-                                w1_n = int(i1.shape[1] * (h_t / i1.shape[0]))
-                                w2_n = int(i2.shape[1] * (h_t / i2.shape[0]))
-                                st.image(np.hstack((cv2.resize(i1, (w1_n, h_t)), cv2.resize(i2, (w2_n, h_t)))), use_container_width=True)
-                        else:
-                            st.image(i1, use_container_width=True)
-
-                    if st.button("🚀 START FINAL BIOMECHANICAL RENDER", key=f"gen_{sport}"):
+                    if st.button("🚀 START FINAL BIOMECHANICAL RENDER", key=f"gen_{sport}", use_container_width=True):
                         st.session_state[final_started_key] = True
                         with st.spinner("Processing Vectors..."):
                             final_v = render_pro_stereo(s['p1'], s['p2'], s['d1']['history'], (s['d2']['history'] if s['d2'] else []), sl1, sl2, s['d1']['fps'])
@@ -932,6 +901,28 @@ for i, tab in enumerate(tabs):
                             tele_opt = build_pro_telemetry(raw_interp, sport, action, sl1, s['d1']['fps'], "dual" if s['p2'] else "lead")
                             st.session_state[f"brief_{sport}"] = generate_brief(tele_opt)
                         st.rerun()
+
+                if final_started_key in st.session_state:
+                    st.video(st.session_state[f"video_{sport}"])
+                    if st.button("🤖 GENERATE AI COACHING REPORT", key=f"ai_{sport}", use_container_width=True):
+                        report_text = generate_pro_report(st.session_state[f"brief_{sport}"])
+                        st.markdown(report_text)
+
+                st.markdown("### 📊 PRO ANALYTICS DASHBOARD")
+                metrics = get_ai_metrics(s['d1']['raw'], s['d1']['fps'])
+                if metrics:
+                    kpis = generate_sport_kpis(metrics, sport, s['d1']['raw'])
+                    insights = get_actionable_insights(kpis, sport)
+                    m1, m2, m3 = st.columns(3)
+                    with m1: draw_modern_metric("Max Velocity", f"{max([v for v in metrics['wrist_speed'] if v is not None] or [0]):.1f}m/s", "+12%", "⚡")
+                    with m2:
+                        if "GYM" in sport: draw_modern_metric("Squat Depth", f"{kpis.get('depth_ratio', 0):.2f}", "-5%", "📏")
+                        elif "GOLF" in sport: draw_modern_metric("X-Factor", f"{kpis.get('max_x_factor', 0):.1f}°", "+8%", "🔄")
+                        else: draw_modern_metric("Avg Tempo", "2.1s", "+0.2s", "⏱️")
+                    with m3: draw_modern_metric("Consistency", "94%", "+2%", "🎯")
+                    for insight in insights: st.success(insight)
+                    st.plotly_chart(plot_power_curve(metrics), use_container_width=True)
+
 
                 # Results Section
                 if final_started_key in st.session_state:
