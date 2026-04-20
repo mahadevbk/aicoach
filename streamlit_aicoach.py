@@ -281,7 +281,7 @@ def generate_pro_report(brief_content, sport="GENERAL", action="MOVEMENT"):
         report_model = genai.GenerativeModel(selected_model)
         
         # Generate sport-specific instructions
-        instructions = generate_sport_specific_prompt(sport, action)
+        instructions = generate_sport_specific_prompt(sport, action, brief_content)
         
         # Call API with enhanced prompt and brief content
         response = report_model.generate_content([instructions, brief_content])
