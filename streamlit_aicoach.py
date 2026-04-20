@@ -602,10 +602,25 @@ def interpolate_landmarks(raw_frames):
             frames[m_idx][j] = val
     return frames
 
-def build_pro_telemetry(raw_frames, sport_raw, action, event_frame, fps, camera_mode):
+def detect_handedness(raw_frames):
+    r_wrist_speeds, l_wrist_speeds = [], []
+    for f in raw_frames:
+        if not f: continue
+        # Simple velocity approximation for wrist markers (16=right, 15=left)
+        r_wrist_speeds.append(f[16]['x']) # Using horizontal position for simplicity
+        l_wrist_speeds.append(f[15]['x'])
+    
+    r_var = np.var(r_wrist_speeds) if len(r_wrist_speeds) > 1 else 0
+    l_var = np.var(l_wrist_speeds) if len(l_wrist_speeds) > 1 else 0
+    return "right" if r_var > l_var else "left"
+
+def build_pro_telemetry(raw_frames, sport_raw, action, event_frame, fps, camera_mode, handedness_override=None):
     total_frames = len(raw_frames)
     sport_clean = "".join([c for c in sport_raw if ord(c) < 128]).strip().upper()
     event_frame = max(0, min(event_frame, total_frames - 1))
+    
+    detected_handedness = detect_handedness(raw_frames)
+    final_handedness = handedness_override if handedness_override else detected_handedness
     
     metrics = {
         "r_elbow": [], "l_elbow": [], "r_knee": [], "l_knee": [], "r_hip": [], "l_hip": [],
@@ -708,7 +723,7 @@ def build_pro_telemetry(raw_frames, sport_raw, action, event_frame, fps, camera_
         "sport": sport_clean, "action": action, "camera": camera_mode,
         "metadata": {
             "fps": fps, "total_frames": total_frames,
-            "dominant_side": "right" if np.max([s for s in metrics["r_wrist_speed"] if s is not None]) > np.max([s for s in metrics["l_wrist_speed"] if s is not None]) else "left",
+            "dominant_side": final_handedness,
             "coordinate_system": {"y_axis": "increases_downward", "z_axis": "depth_into_camera", "normalisation": "mediapipe_image_fraction_0_to_1"},
             "validation_warnings": validation_warnings
         },
@@ -1208,6 +1223,9 @@ with tab2:
             sl2 = st.slider("ALIGN SECONDARY VIEW", 0, s['d2']['total']-1, s['d2']['impact'], key="sl2_sync", label_visibility="collapsed")
             st.caption(f"SECONDARY SYNC: {sl2}")
             
+        detected_side = detect_handedness(s['d1']['raw'])
+        handedness_choice = st.radio("ATHLETE HANDEDNESS", ["Auto-detect (Detected: " + detected_side.upper() + ")", "Left Handed", "Right Handed"], index=0, key="hand_sel")
+        
         # Preview
         cap1 = cv2.VideoCapture(s['p1']); cap1.set(cv2.CAP_PROP_POS_FRAMES, sl1)
         ret1, i1 = cap1.read(); cap1.release()
@@ -1228,8 +1246,13 @@ with tab2:
             with st.spinner("PROCESSING VECTORS..."):
                 final_v = render_pro_stereo(s['p1'], s['p2'], s['d1']['history'], (s['d2']['history'] if s['d2'] else []), sl1, sl2, s['d1']['fps'])
                 st.session_state["final_video"] = final_v
+                
+                h_val = None
+                if "Left" in st.session_state.hand_sel: h_val = "left"
+                elif "Right" in st.session_state.hand_sel: h_val = "right"
+                
                 raw_interp = interpolate_landmarks(s['d1']['raw'])
-                tele_opt = build_pro_telemetry(raw_interp, sport, action, sl1, s['d1']['fps'], "dual" if s['p2'] else "lead")
+                tele_opt = build_pro_telemetry(raw_interp, sport, action, sl1, s['d1']['fps'], "dual" if s['p2'] else "lead", handedness_override=h_val)
                 st.session_state["brief"] = generate_brief(tele_opt)
                 st.session_state["sl1_val"] = sl1 # For efficiency calc
             
