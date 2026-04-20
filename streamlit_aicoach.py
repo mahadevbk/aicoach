@@ -256,14 +256,17 @@ import plotly.express as px
 
 st.markdown("""
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=Roboto+Flex:wght@100..1000&display=swap');
     @import url('https://fonts.googleapis.com/css2?family=Bitcount+Prop+Single&display=swap');
     :root {
         --neon-green: #ccff00;
         --glass-bg: rgba(255, 255, 255, 0.05);
         --glass-border: rgba(255, 255, 255, 0.1);
     }
-    .stApp { background: radial-gradient(circle at top right, #0f172a, #020617); color: #f8fafc; font-family: 'Roboto Flex', sans-serif; }
+    /* Global Font Override */
+    .stApp, .stApp *, button, input, select, textarea, .stTabs [data-baseweb="tab"] p { 
+        font-family: 'Bitcount Prop Single', sans-serif !important; 
+    }
+    .stApp { background: radial-gradient(circle at top right, #0f172a, #020617); color: #f8fafc; }
     
     .main { padding: 1rem 0.5rem; }
     
@@ -317,8 +320,8 @@ st.markdown("""
         margin-bottom: 10px;
     }
 
-    h1 { font-family: 'Bitcount Prop Single', sans-serif !important; font-size: clamp(2rem, 8vw, 4rem) !important; font-weight: normal !important; background: linear-gradient(to right, #00f2fe, #4facfe); -webkit-background-clip: text; -webkit-text-fill-color: transparent; text-align: center; margin-bottom: 0px !important; }
-    .hero-sub { font-family: 'Bitcount Prop Single', sans-serif !important; text-align: center; color: #94a3b8; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 4px; margin-bottom: 2rem; }
+    h1 { font-size: clamp(2rem, 8vw, 4rem) !important; font-weight: normal !important; background: linear-gradient(to right, #00f2fe, #4facfe); -webkit-background-clip: text; -webkit-text-fill-color: transparent; text-align: center; margin-bottom: 0px !important; }
+    .hero-sub { text-align: center; color: #94a3b8; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 4px; margin-bottom: 2rem; }
 
     div.stButton > button:has(div:contains("GENERATE AI COACHING REPORT")) {
         background: linear-gradient(135deg, #ffd700 0%, #daa520 50%, #b8860b 100%) !important;
