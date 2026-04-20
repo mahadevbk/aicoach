@@ -274,8 +274,10 @@ st.markdown("""
     }
 
     /* Standardise File Uploader - Keep Font, Fix Overlap by disabling uppercase */
-    [data-testid="stFileUploader"] * {
-        text-transform: none !important;
+
+    [data-testid="stFileUploader"] {
+    margin-top: 2rem;    /* Increase from 1rem */
+    margin-bottom: 1.5rem;  /* Increase from 1rem */
     }
     
     .stApp { background: radial-gradient(circle at top right, #0f172a, #020617); color: #f8fafc; }
