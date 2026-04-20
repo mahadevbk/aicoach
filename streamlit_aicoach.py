@@ -51,7 +51,7 @@ def generate_pro_report(brief_content):
         Create a professional coaching report based on the telemetry provided.
         START THE REPORT WITH THIS EXACT HEADER: "VECTOR VICTOR AI - BIO MECHANICAL ANALYSIS"
         Include Tables for scores, Phase Analysis, and specific Coaching Drills.
-        Use professional, direct language.
+        Use professional, direct language but be positive and encouraging.
         """
         response = report_model.generate_content([instructions, brief_content])
         return response.text
