@@ -1185,8 +1185,7 @@ with tab1:
                 status.update(label="INITIAL ANALYSIS COMPLETE!", state="complete")
             
             # INFO FOR USER
-            st.info("✅ INITIAL ANALYSIS COMPLETE! PLEASE PROCEED TO THE 'ANALYZE' TAB ABOVE.")
-            st.balloons()
+            st.success("✅ INITIAL ANALYSIS COMPLETE! PLEASE PROCEED TO THE 'ANALYZE' TAB ABOVE.")
     else:
         st.info("📌 UPLOAD A VIDEO TO START.")
 
@@ -1235,8 +1234,7 @@ with tab2:
                 st.session_state["sl1_val"] = sl1 # For efficiency calc
             
             # INFO FOR USER
-            st.info("✅ BIOMECHANICAL RENDER COMPLETE! PLEASE PROCEED TO THE 'RESULTS' TAB ABOVE.")
-            st.snow()
+            st.success("✅ BIOMECHANICAL RENDER COMPLETE! PLEASE PROCEED TO THE 'RESULTS' TAB ABOVE.")
 
 # Tab 3: Results
 with tab3:
