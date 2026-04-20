@@ -836,94 +836,100 @@ SPORT_CONFIG = {
     ]
 }
 
-# DYNAMIC TAB GENERATION
+# --- DYNAMIC TAB GENERATION ---
 sport_names = list(SPORT_CONFIG.keys())
 tabs = st.tabs(sport_names)
 
 for i, tab in enumerate(tabs):
     sport = sport_names[i]
     with tab:
-        st.markdown("""
+        st.markdown(f"""
             <div class="glass-card">
-                <div style="color: #ccff00; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px;">🚀 Quick Start Guide</div>
+                <div style="color: #ccff00; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px;">🚀 {sport} Quick Start Guide</div>
                 <div style="font-size: 0.9rem; color: #94a3b8; display: flex; gap: 20px; flex-wrap: wrap;">
-                    <span><b>1.</b> Upload Video(s)</span>
-                    <span><b>2.</b> Sync Impact Frame (if needed)</span>
-                    <span><b>3.</b> Align Stereographic Sliders</span>
-                    <span><b>4.</b> Generate Analysis Pack</span>
-                    <span><b>5.</b> Upload JSON to Claude/GPT/Gemini for analysis</span>
+                    <span><b>1.</b> Select specific action</span>
+                    <span><b>2.</b> Upload Source(s)</span>
+                    <span><b>3.</b> Sync Impact Frame</span>
+                    <span><b>4.</b> Generate Analysis</span>
                 </div>
             </div>
         """, unsafe_allow_html=True)
+        
         col_ui, col_viz = st.columns([1, 2])
+        res_key = f"data_{sport}"
+        
         with col_ui:
             st.markdown(f"### {sport} Settings")
-            # This automatically populates the dropdown based on the exhaustive list above
+            # Combined Action Selector
             action = st.selectbox(
-                f"Select {sport} Action", 
+                "Select Specific Action", 
                 SPORT_CONFIG[sport], 
-                key=f"action_{sport}"
+                key=f"act_sel_{sport}"
             )
             
-            # The rest of your existing UI logic (Uploaders, Sliders, etc.)
-            uploaded_file = st.file_uploader(
-                f"Upload {sport} Video", 
-                type=['mp4', 'mov', 'avi'], 
-                key=f"file_{sport}"
-            )
-        c1, c2 = st.columns([1, 2])
-        res_key = f"data_{sport}"
-        with c1:
-            st.info(f"AI ENGINE: {sport}")
-            is_stereo = st.toggle("Stereographic Mode", value=False, key=f"st_{sport}")
-            u1 = st.file_uploader("Source 1", type=["mp4","mov"], key=f"u1_{sport}")
-            u2 = st.file_uploader("Source 2", type=["mp4","mov"], key=f"u2_{sport}") if is_stereo else None
-            sel_act = action # Reuse the action variable defined in the same loop context.
-            if st.button("RUN PRO ANALYSIS", key=f"run_{sport}", width="stretch"):
-                model_task = download_model()
-                t1_p = os.path.join(tempfile.gettempdir(), f"l_{sport}.mp4")
-                with open(t1_p, "wb") as f: f.write(u1.getbuffer())
-                with st.status("Analyzing...") as status:
-                    d1 = analyze_vid(t1_p, model_task)
-                    d2, t2_p = None, None
-                    if is_stereo and u2:
-                        t2_p = os.path.join(tempfile.gettempdir(), f"s_{sport}.mp4")
-                        with open(t2_p, "wb") as f: f.write(u2.getbuffer())
-                        d2 = analyze_vid(t2_p, model_task)
-                    st.session_state[res_key] = {"d1": d1, "d2": d2, "p1": t1_p, "p2": t2_p}
-        with c2:
+            is_stereo = st.toggle("Stereographic Mode (Dual View)", value=False, key=f"st_{sport}")
+            
+            u1 = st.file_uploader("Source 1 (Lead/Side View)", type=["mp4","mov"], key=f"u1_{sport}")
+            u2 = None
+            if is_stereo:
+                u2 = st.file_uploader("Source 2 (Back/Alternative View)", type=["mp4","mov"], key=f"u2_{sport}")
+
+            if st.button("RUN PRO ANALYSIS", key=f"run_{sport}"):
+                if u1 is not None:
+                    model_task = download_model()
+                    t1_p = os.path.join(tempfile.gettempdir(), f"l_{sport}.mp4")
+                    with open(t1_p, "wb") as f: f.write(u1.getbuffer())
+                    
+                    with st.status(f"Analyzing {sport}...") as status:
+                        d1 = analyze_vid(t1_p, model_task)
+                        d2, t2_p = None, None
+                        if is_stereo and u2:
+                            t2_p = os.path.join(tempfile.gettempdir(), f"s_{sport}.mp4")
+                            with open(t2_p, "wb") as f: f.write(u2.getbuffer())
+                            d2 = analyze_vid(t2_p, model_task)
+                        st.session_state[res_key] = {"d1": d1, "d2": d2, "p1": t1_p, "p2": t2_p}
+                else:
+                    st.error("Please upload at least one video file.")
+
+        with col_viz:
             if res_key in st.session_state:
                 s = st.session_state[res_key]
                 final_started_key = f"started_{sport}"
                 
-                # Only show sync controls if final processing hasn't started
+                # Syncing & Frame Selection
                 if final_started_key not in st.session_state:
-                    if s['p2']: st.warning("⚠️ **STEREOGRAPHIC SYNC:** Use the sliders below to ensure both views are perfectly aligned on the **Impact Frame**.")
-                    sl1 = st.slider("Source 1 Frame", 0, s['d1']['total']-1, s['d1']['impact'], key=f"sl1_{sport}")
-                    sl2 = st.slider("Source 2 Frame", 0, (s['d2']['total']-1 if s['d2'] else 0), (s['d2']['impact'] if s['d2'] else 0), key=f"sl2_{sport}") if s['d2'] else 0
+                    if s['p2']: st.warning("⚠️ **STEREOGRAPHIC SYNC:** Align both views on the **Impact/Peak** frame.")
                     
-                    cap1 = cv2.VideoCapture(s['p1']); cap1.set(1, sl1); ret1, i1 = cap1.read(); cap1.release()
+                    sl1 = st.slider("Source 1 Sync", 0, s['d1']['total']-1, s['d1']['impact'], key=f"sl1_{sport}")
+                    sl2 = 0
+                    if s['p2']:
+                        sl2 = st.slider("Source 2 Sync", 0, s['d2']['total']-1, s['d2']['impact'], key=f"sl2_{sport}")
+                    
+                    # Preview Logic
+                    cap1 = cv2.VideoCapture(s['p1']); cap1.set(cv2.CAP_PROP_POS_FRAMES, sl1)
+                    ret1, i1 = cap1.read(); cap1.release()
+                    
                     if ret1 and i1 is not None:
                         i1 = cv2.cvtColor(i1, cv2.COLOR_BGR2RGB)
-                    if s['p2']:
-                        cap2 = cv2.VideoCapture(s['p2']); cap2.set(1, sl2); ret2, i2 = cap2.read(); cap2.release()
-                        if ret2 and i2 is not None:
-                            i2 = cv2.cvtColor(i2, cv2.COLOR_BGR2RGB)
-                        h1, w1 = i1.shape[:2]; h2, w2 = i2.shape[:2]
-                        h_target = int(min(h1, h2) * 0.5)
-                        w1_new, w2_new = int(w1 * (h_target / h1)), int(w2 * (h_target / h2))
-                        st.image(np.hstack((cv2.resize(i1, (w1_new, h_target)), cv2.resize(i2, (w2_new, h_target)))), width="stretch")
-                    else:
-                        h, w = i1.shape[:2]
-                        st.image(cv2.resize(i1, (int(w*0.5), int(h*0.5))), width="stretch")
+                        if s['p2']:
+                            cap2 = cv2.VideoCapture(s['p2']); cap2.set(cv2.CAP_PROP_POS_FRAMES, sl2)
+                            ret2, i2 = cap2.read(); cap2.release()
+                            if ret2 and i2 is not None:
+                                i2 = cv2.cvtColor(i2, cv2.COLOR_BGR2RGB)
+                                h_t = 400
+                                w1_n = int(i1.shape[1] * (h_t / i1.shape[0]))
+                                w2_n = int(i2.shape[1] * (h_t / i2.shape[0]))
+                                st.image(np.hstack((cv2.resize(i1, (w1_n, h_t)), cv2.resize(i2, (w2_n, h_t)))), use_container_width=True)
+                        else:
+                            st.image(i1, use_container_width=True)
 
-                    if st.button("🚀 START FINAL PROCESSING", key=f"gen_{sport}", width="stretch"):
+                    if st.button("🚀 START FINAL BIOMECHANICAL RENDER", key=f"gen_{sport}"):
                         st.session_state[final_started_key] = True
-                        with st.spinner("Rendering final analysis video..."):
+                        with st.spinner("Processing Vectors..."):
                             final_v = render_pro_stereo(s['p1'], s['p2'], s['d1']['history'], (s['d2']['history'] if s['d2'] else []), sl1, sl2, s['d1']['fps'])
                             st.session_state[f"video_{sport}"] = final_v
                             raw_interp = interpolate_landmarks(s['d1']['raw'])
-                            tele_opt = build_pro_telemetry(raw_interp, sport, sel_act, sl1, s['d1']['fps'], "dual" if s['p2'] else "lead")
+                            tele_opt = build_pro_telemetry(raw_interp, sport, action, sl1, s['d1']['fps'], "dual" if s['p2'] else "lead")
                             st.session_state[f"brief_{sport}"] = generate_brief(tele_opt)
                         st.rerun()
 
