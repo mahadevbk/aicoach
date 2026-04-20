@@ -321,6 +321,7 @@ st.markdown("""
     }
 
     h1 { font-size: clamp(2rem, 8vw, 4rem) !important; font-weight: normal !important; background: linear-gradient(to right, #00f2fe, #4facfe); -webkit-background-clip: text; -webkit-text-fill-color: transparent; text-align: center; margin-bottom: 0px !important; }
+    h4 { font-size: 1.2rem !important; font-weight: 700 !important; color: var(--neon-green); text-transform: uppercase; margin-top: 1.5rem !important; margin-bottom: 1rem !important; }
     .hero-sub { text-align: center; color: #94a3b8; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 4px; margin-bottom: 2rem; }
 
     div.stButton > button:has(div:contains("GENERATE AI COACHING REPORT")) {
@@ -825,23 +826,23 @@ st.markdown("<h1>Vector Victor AI</h1>", unsafe_allow_html=True)
 st.markdown("<p class='hero-sub'>Deep form Vector based Bio mechanics AI engine</p>", unsafe_allow_html=True)
 
 # Tabs Navigation
-tab1, tab2, tab3 = st.tabs(["📹 Upload", "🔧 Analyze", "📊 Results"])
+tab1, tab2, tab3 = st.tabs(["UPLOAD", "ANALYZE", "RESULTS"])
 
 # Tab 1: Upload
 with tab1:
-    st.subheader("Upload Videos")
-    selected_sport = st.selectbox("Select Sport", list(SPORT_CONFIG.keys()), key="sport_sel")
-    selected_action = st.selectbox("Select Action", SPORT_CONFIG[selected_sport], key="action_sel")
+    st.markdown("#### UPLOAD VIDEOS", unsafe_allow_html=True)
+    selected_sport = st.selectbox("SELECT SPORT", list(SPORT_CONFIG.keys()), key="sport_sel")
+    selected_action = st.selectbox("SELECT ACTION", SPORT_CONFIG[selected_sport], key="action_sel")
     
-    st.markdown("### 📹 Primary View (Required)")
-    u1 = st.file_uploader("Upload main angle", type=["mp4","mov"], key="u1_upload", label_visibility="collapsed")
+    st.markdown("#### PRIMARY VIEW", unsafe_allow_html=True)
+    u1 = st.file_uploader("UPLOAD MAIN ANGLE", type=["mp4","mov"], key="u1_upload", label_visibility="collapsed")
     if u1: display_file_info(u1)
     
-    is_stereo = st.toggle("Stereographic Mode (Dual View)", value=False, key="st_toggle")
+    is_stereo = st.toggle("STEREOGRAPHIC MODE (DUAL VIEW)", value=False, key="st_toggle")
     u2 = None
     if is_stereo:
-        st.markdown("### 📹 Secondary View (Optional)")
-        u2 = st.file_uploader("Upload second angle", type=["mp4","mov"], key="u2_upload", label_visibility="collapsed")
+        st.markdown("#### SECONDARY VIEW", unsafe_allow_html=True)
+        u2 = st.file_uploader("UPLOAD SECOND ANGLE", type=["mp4","mov"], key="u2_upload", label_visibility="collapsed")
         if u2: display_file_info(u2)
 
     if u1:
@@ -855,7 +856,7 @@ with tab1:
             t1_p = os.path.join(tempfile.gettempdir(), f"l_raw.mp4")
             with open(t1_p, "wb") as f: f.write(u1.getbuffer())
             
-            with st.status(f"Analyzing {selected_sport}...") as status:
+            with st.status(f"ANALYZING {selected_sport.upper()}...") as status:
                 d1 = analyze_vid(t1_p, model_task)
                 d2, t2_p = None, None
                 if is_stereo and u2:
@@ -864,29 +865,29 @@ with tab1:
                     d2 = analyze_vid(t2_p, model_task)
                 
                 st.session_state["data_current"] = {"d1": d1, "d2": d2, "p1": t1_p, "p2": t2_p}
-                status.update(label="Initial analysis complete!", state="complete")
+                status.update(label="INITIAL ANALYSIS COMPLETE!", state="complete")
             st.rerun()
     else:
-        st.info("📌 Upload a video to start.")
+        st.info("📌 UPLOAD A VIDEO TO START.")
 
 # Tab 2: Analyze
 with tab2:
     if "data_current" not in st.session_state:
-        st.warning("⚠️ Upload and process a video first.")
+        st.warning("⚠️ UPLOAD AND PROCESS A VIDEO FIRST.")
     else:
         s = st.session_state["data_current"]
         sport, action = st.session_state["sport"], st.session_state["action"]
-        st.subheader(f"Synchronize: {sport}")
+        st.markdown(f"#### SYNCHRONIZE: {sport.upper()}", unsafe_allow_html=True)
         
-        st.markdown("### 🎬 Source 1 Sync")
-        sl1 = st.slider("Align on Impact Frame", 0, s['d1']['total']-1, s['d1']['impact'], key="sl1_sync", label_visibility="collapsed")
-        st.caption(f"Impact Frame: {sl1}")
+        st.markdown("#### SOURCE 1 SYNC")
+        sl1 = st.slider("ALIGN ON IMPACT FRAME", 0, s['d1']['total']-1, s['d1']['impact'], key="sl1_sync", label_visibility="collapsed")
+        st.caption(f"IMPACT FRAME: {sl1}")
         
         sl2 = 0
         if s['p2']:
-            st.markdown("### 🎬 Source 2 Sync")
-            sl2 = st.slider("Align secondary view", 0, s['d2']['total']-1, s['d2']['impact'], key="sl2_sync", label_visibility="collapsed")
-            st.caption(f"Secondary Sync: {sl2}")
+            st.markdown("#### SOURCE 2 SYNC")
+            sl2 = st.slider("ALIGN SECONDARY VIEW", 0, s['d2']['total']-1, s['d2']['impact'], key="sl2_sync", label_visibility="collapsed")
+            st.caption(f"SECONDARY SYNC: {sl2}")
             
         # Preview
         cap1 = cv2.VideoCapture(s['p1']); cap1.set(cv2.CAP_PROP_POS_FRAMES, sl1)
@@ -905,7 +906,7 @@ with tab2:
                 st.image(i1, use_container_width=True)
 
         if st.button("🚀 START FINAL BIOMECHANICAL RENDER", type="primary", use_container_width=True):
-            with st.spinner("Processing Vectors..."):
+            with st.spinner("PROCESSING VECTORS..."):
                 final_v = render_pro_stereo(s['p1'], s['p2'], s['d1']['history'], (s['d2']['history'] if s['d2'] else []), sl1, sl2, s['d1']['fps'])
                 st.session_state["final_video"] = final_v
                 raw_interp = interpolate_landmarks(s['d1']['raw'])
@@ -917,14 +918,14 @@ with tab2:
 # Tab 3: Results
 with tab3:
     if "final_video" not in st.session_state:
-        st.warning("⚠️ Complete the synchronization and render first.")
+        st.warning("⚠️ COMPLETE THE SYNCHRONIZATION AND RENDER FIRST.")
     else:
         s = st.session_state["data_current"]
         sport, action = st.session_state["sport"], st.session_state["action"]
-        st.subheader("Performance Analysis")
+        st.markdown("#### PERFORMANCE ANALYSIS", unsafe_allow_html=True)
         st.video(st.session_state["final_video"])
         
-        st.markdown("### 📊 PRO ANALYTICS DASHBOARD")
+        st.markdown("#### PRO ANALYTICS DASHBOARD")
         metrics = get_ai_metrics(s['d1']['raw'], s['d1']['fps'])
         if metrics:
             kpis = generate_sport_kpis(metrics, sport, s['d1']['raw'])
@@ -933,41 +934,41 @@ with tab3:
             draw_mobile_metric_grid(m_grid)
             
             st.markdown("---")
-            st.markdown("### 💡 AI Coaching Insights")
-            for insight in insights: st.success(insight)
+            st.markdown("#### AI COACHING INSIGHTS")
+            for insight in insights: st.success(insight.upper())
             
             st.markdown("---")
-            st.markdown("### 📊 Detailed Analytics")
-            chart_view = st.radio("Choose view", ["Power Curve", "Radar Chart", "Kinetic Chain"], horizontal=True, label_visibility="collapsed")
-            if chart_view == "Power Curve": st.plotly_chart(plot_power_curve(metrics), use_container_width=True)
-            elif chart_view == "Radar Chart": st.plotly_chart(plot_radar_chart(metrics), use_container_width=True)
+            st.markdown("#### DETAILED ANALYTICS")
+            chart_view = st.radio("CHOOSE VIEW", ["POWER CURVE", "RADAR CHART", "KINETIC CHAIN"], horizontal=True, label_visibility="collapsed")
+            if chart_view == "POWER CURVE": st.plotly_chart(plot_power_curve(metrics), use_container_width=True)
+            elif chart_view == "RADAR CHART": st.plotly_chart(plot_radar_chart(metrics), use_container_width=True)
             else: st.plotly_chart(plot_kinetic_chain(metrics), use_container_width=True)
             
             st.markdown("---")
             if st.button("🤖 GENERATE AI COACHING REPORT", type="primary", use_container_width=True):
-                with st.status("AI is analyzing...") as status:
+                with st.status("AI IS ANALYZING...") as status:
                     report_text = generate_pro_report(st.session_state["brief"])
                     st.session_state["report_text"] = report_text
-                    status.update(label="Report Complete!", state="complete")
+                    status.update(label="REPORT COMPLETE!", state="complete")
             
             if "report_text" in st.session_state:
                 st.markdown(st.session_state["report_text"])
                 
-                st.markdown("### 📥 Export & Share")
+                st.markdown("#### EXPORT & SHARE")
                 c1, c2 = st.columns(2)
                 with c1:
                     docx_f = create_docx_report(st.session_state["report_text"], sport)
-                    st.download_button("📄 Word Doc", docx_f, f"{sport}_Analysis.docx", use_container_width=True)
+                    st.download_button("📄 WORD DOC", docx_f, f"{sport}_ANALYSIS.docx", use_container_width=True)
                 with c2:
                     pdf_f = create_pdf_report(st.session_state["report_text"], sport)
-                    st.download_button("📜 PDF Report", pdf_f, f"{sport}_Analysis.pdf", use_container_width=True)
+                    st.download_button("📜 PDF REPORT", pdf_f, f"{sport}_ANALYSIS.pdf", use_container_width=True)
                 
                 z_buf = io.BytesIO()
                 with zipfile.ZipFile(z_buf, "w") as zf:
                     zf.write(st.session_state["final_video"], "analysis.mp4")
                     zf.writestr("AI_BRIEF.txt", st.session_state["brief"])
-                st.download_button("📥 Download ZIP (Video + Data)", z_buf.getvalue(), f"{sport}_Data.zip", use_container_width=True)
+                st.download_button("📥 DOWNLOAD ZIP (VIDEO + DATA)", z_buf.getvalue(), f"{sport}_DATA.zip", use_container_width=True)
 
-        if st.button("↺ Analyze Another Video", use_container_width=True):
+        if st.button("↺ ANALYZE ANOTHER VIDEO", use_container_width=True):
             for key in list(st.session_state.keys()): del st.session_state[key]
             st.rerun()
