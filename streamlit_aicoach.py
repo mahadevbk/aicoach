@@ -824,8 +824,8 @@ SPORT_CONFIG = {
 }
 
 # App Header
-st.markdown("<h1>Vector Victor AI</h1>", unsafe_allow_html=True)
-st.markdown("<p class='hero-sub'>Deep form Vector based Bio mechanics AI engine</p>", unsafe_allow_html=True)
+#st.markdown("<h1>Vector Victor AI</h1>", unsafe_allow_html=True)
+#st.markdown("<p class='hero-sub'>Deep form Vector based Bio mechanics AI engine</p>", unsafe_allow_html=True)
 
 # Setup Gemini
 if "GEMINI_API_KEY" in st.secrets:
