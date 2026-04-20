@@ -47,11 +47,12 @@ def generate_pro_report(brief_content):
 
         report_model = genai.GenerativeModel(selected_model)
         instructions = """
-        Act as a Senior Biomechanical Engineer. 
-        Create a professional coaching report based on the telemetry provided.
+        Act as a sports coach, Create a professional coaching report based on the telemetry provided.
         START THE REPORT WITH THIS EXACT HEADER: "VECTOR VICTOR AI - BIO MECHANICAL ANALYSIS"
+        Give a short description of what a coach sees (good and bad) and would advice the athlete to get batter.
         Include Tables for scores, Phase Analysis, and specific Coaching Drills.
         Use professional, direct language but be positive and encouraging.
+        As a biomechanical engineer, provide the data backing up the coach's recommendations as the last section of the document.
         """
         response = report_model.generate_content([instructions, brief_content])
         return response.text
