@@ -274,11 +274,24 @@ st.markdown("""
     }
 
     /* Standardise File Uploader - Keep Font, Fix Overlap by disabling uppercase */
-
-    [data-testid="stFileUploader"] {
-    margin-top: 2rem;    /* Increase from 1rem */
-    margin-bottom: 1.5rem;  /* Increase from 1rem */
+     /* Target the 'Browse files' button text */
+    [data-testid="stFileUploader"] section button div {
+        font-size: 0 !important; /* Hides the original 'Browse files' text */
     }
+    
+    /* Inject your custom name */
+    [data-testid="stFileUploader"] section button div::before {
+        content: "CHOOSE VIDEO"; /* Replace this with " " if you want it empty */
+        font-size: 14px !important;
+        font-family: 'Bitcount Prop Single', sans-serif !important;
+        text-transform: uppercase;
+        visibility: visible;
+    }
+
+/* Remove the 'Limit 200MB' and original filename helper text if you want a cleaner look */
+[data-testid="stFileUploader"] section > div {
+    display: none !important;
+}
     
     .stApp { background: radial-gradient(circle at top right, #0f172a, #020617); color: #f8fafc; }
     .main { padding: 1rem 0.5rem; }
