@@ -837,14 +837,14 @@ with tab1:
     selected_action = st.selectbox("SELECT ACTION", SPORT_CONFIG[selected_sport], key="action_sel")
     
     st.markdown("#### PRIMARY VIEW", unsafe_allow_html=True)
-    u1 = st.file_uploader("UPLOAD MAIN ANGLE", type=["mp4","mov"], key="u1_upload", label_visibility="hidden")
+    u1 = st.file_uploader("UPLOAD MAIN ANGLE", type=["mp4","mov"], key="u1_upload", label_visibility="collapsed")
     if u1: display_file_info(u1)
     
     is_stereo = st.toggle("STEREOGRAPHIC MODE (DUAL VIEW)", value=False, key="st_toggle")
     u2 = None
     if is_stereo:
         st.markdown("#### SECONDARY VIEW", unsafe_allow_html=True)
-        u2 = st.file_uploader("UPLOAD SECOND ANGLE", type=["mp4","mov"], key="u2_upload", label_visibility="hidden")
+        u2 = st.file_uploader("UPLOAD SECOND ANGLE", type=["mp4","mov"], key="u2_upload", label_visibility="collapsed")
         if u2: display_file_info(u2)
 
     if u1:
