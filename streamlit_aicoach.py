@@ -258,8 +258,6 @@ def create_pdf_report(text, sport_name):
 
     return bytes(pdf.output())
 
-    return bytes(pdf.output())
-
 # --- 1. FULL PREMIUM UI ---
 st.set_page_config(page_title="Vector Victor AI Skeletonkey", page_icon="🎾", layout="wide", initial_sidebar_state="collapsed")
 
@@ -596,8 +594,12 @@ def build_pro_telemetry(raw_frames, sport_raw, action, event_frame, fps, camera_
 
 def get_ai_metrics(raw_frames, fps):
     if not raw_frames: return None
-    metrics = {"l_elbow": [], "r_elbow": [], "l_knee": [], "r_knee": [], "l_hip": [], "r_hip": [], "wrist_speed": [], "hip_speed": [], "shoulder_speed": []}
-    prev_w, prev_h, prev_s = None, None, None
+    metrics = {
+        "l_elbow": [], "r_elbow": [], "l_knee": [], "r_knee": [], "l_hip": [], "r_hip": [], 
+        "wrist_speed": [], "hip_speed": [], "shoulder_speed": [], "ankle_speed": [],
+        "trunk_lean": [], "trunk_lateral_lean": []
+    }
+    prev_w, prev_h, prev_s, prev_a = None, None, None, None
     for f in raw_frames:
         if not f:
             for k in metrics: metrics[k].append(None)
@@ -608,15 +610,29 @@ def get_ai_metrics(raw_frames, fps):
         metrics["r_knee"].append(calculate_3d_angle(f[24], f[26], f[28]))
         metrics["l_hip"].append(calculate_3d_angle(f[11], f[23], f[25]))
         metrics["r_hip"].append(calculate_3d_angle(f[12], f[24], f[26]))
+        
+        # Speed calculations
         curr_w = np.array([f[16]['x'], f[16]['y'], f[16]['z']])
         metrics["wrist_speed"].append(round(float(np.linalg.norm(curr_w - (prev_w if prev_w is not None else curr_w))*fps),4))
         prev_w = curr_w
+        
         curr_h = np.array([(f[23]['x']+f[24]['x'])/2, (f[23]['y']+f[24]['y'])/2, (f[23]['z']+f[24]['z'])/2])
         metrics["hip_speed"].append(round(float(np.linalg.norm(curr_h - (prev_h if prev_h is not None else curr_h))*fps),4))
         prev_h = curr_h
+        
         curr_s = np.array([(f[11]['x']+f[12]['x'])/2, (f[11]['y']+f[12]['y'])/2, (f[11]['z']+f[12]['z'])/2])
         metrics["shoulder_speed"].append(round(float(np.linalg.norm(curr_s - (prev_s if prev_s is not None else curr_s))*fps),4))
         prev_s = curr_s
+        
+        curr_a = np.array([f[28]['x'], f[28]['y'], f[28]['z']])
+        metrics["ankle_speed"].append(round(float(np.linalg.norm(curr_a - (prev_a if prev_a is not None else curr_a))*fps),4))
+        prev_a = curr_a
+        
+        # Trunk Lean for Efficiency
+        mid_s, mid_h = get_midpoint(f[11], f[12]), get_midpoint(f[23], f[24])
+        metrics["trunk_lean"].append(abs(calculate_lean(mid_s, mid_h, 'sagittal')))
+        metrics["trunk_lateral_lean"].append(calculate_lean(mid_s, mid_h, 'coronal'))
+        
     return metrics
 
 def generate_sport_kpis(metrics, sport, raw_frames):
@@ -625,14 +641,23 @@ def generate_sport_kpis(metrics, sport, raw_frames):
     wrist_speed = clean(metrics["wrist_speed"])
     hip_speed = clean(metrics["hip_speed"])
     shoulder_speed = clean(metrics["shoulder_speed"])
-    RACKET_BAT = ["TENNIS 🎾", "PADEL 🎾", "PICKLEBALL 🥒", "BADMINTON 🏸", "CRICKET 🏏", "GOLF ⛳"]
-    if sport in RACKET_BAT:
+    
+    RACKET_BAT = ["TENNIS 🎾", "PADEL 🎾", "PICKLEBALL 🥒", "BADMINTON 🏸", "CRICKET 🏏", "GOLF ⛳", "BASEBALL ⚾"]
+    if any(s in sport for s in RACKET_BAT) or "SOCCER" in sport:
         peak_hip = np.argmax(hip_speed)
         peak_shoulder = np.argmax(shoulder_speed)
         peak_wrist = np.argmax(wrist_speed)
         kpis["sequence"] = [peak_hip, peak_shoulder, peak_wrist]
         kpis["sequence_valid"] = peak_hip < peak_shoulder < peak_wrist
-        if sport == "GOLF ⛳":
+        
+        # Kinetic Linkage Score (Simplified)
+        # Higher score if hip leads shoulder by 2-10 frames
+        timing_diff = peak_shoulder - peak_hip
+        if 2 <= timing_diff <= 10: kpis["linkage_score"] = 100
+        elif 0 < timing_diff < 2: kpis["linkage_score"] = 70
+        else: kpis["linkage_score"] = 40
+        
+        if "GOLF" in sport:
             x_factors = []
             for f in raw_frames:
                 if f:
@@ -642,13 +667,21 @@ def generate_sport_kpis(metrics, sport, raw_frames):
                     x_factors.append(np.degrees(np.arccos(np.clip(cos_sim, -1.0, 1.0))))
                 else: x_factors.append(0)
             kpis["max_x_factor"] = max(x_factors) if x_factors else 0
-    elif sport == "GYM 🏋️":
+            
+    elif "MARTIAL ARTS" in sport or "BOXING" in sport:
+        # Impact Snap: Peak deceleration speed
+        # Find peak speed and the speed 2 frames later
+        peak_idx = np.argmax(wrist_speed)
+        after_impact_idx = min(len(wrist_speed)-1, peak_idx + 2)
+        kpis["impact_snap"] = abs(wrist_speed[peak_idx] - wrist_speed[after_impact_idx])
+            
+    elif "GYM" in sport:
         hip_y = [(f[23]['y'] + f[24]['y'])/2 for f in raw_frames if f]
         knee_y = [(f[25]['y'] + f[26]['y'])/2 for f in raw_frames if f]
         if hip_y and knee_y: kpis["depth_ratio"] = min(hip_y) / (max(knee_y) + 1e-6)
         wrist_x = [(f[15]['x'] + f[16]['x'])/2 for f in raw_frames if f]
         if wrist_x: kpis["bar_deviation"] = np.std(wrist_x)
-    elif sport == "YOGA 🧘":
+    elif "YOGA" in sport:
         com_x = [(f[23]['x'] + f[24]['x'])/2 for f in raw_frames if f]
         if com_x: kpis["stability"] = 1.0 - np.std(com_x)
     return kpis
@@ -946,11 +979,11 @@ for i, tab in enumerate(tabs):
                         else:
                             zf.writestr("SHARE_FILE_WITH_AI.txt", "Brief not yet generated.")
                     
-                    st.download_button("📥 DOWNLOAD VIDEO & AI BRIEF", z_buf.getvalue(), f"{sport}_Report.zip", width="stretch")
+                    st.download_button("📥 DOWNLOAD VIDEO & AI BRIEF", z_buf.getvalue(), f"{sport}_Report.zip", use_container_width=True)
 
                     if f"brief_{sport}" in st.session_state:
                         st.markdown("---")
-                        if st.button("🤖 GENERATE AI COACHING REPORT", key=f"ai_{sport}", width="stretch"):
+                        if st.button("🤖 GENERATE AI COACHING REPORT", key=f"ai_{sport}", use_container_width=True):
                             coaching_brief = st.session_state[f"brief_{sport}"]
                             with st.status("Vector Victor AI is analyzing your biomechanics...") as status:
                                 report_text = generate_pro_report(coaching_brief)
@@ -962,12 +995,12 @@ for i, tab in enumerate(tabs):
                                     st.markdown("---")
                                     st.markdown(report_text)
                                     docx_file = create_docx_report(report_text, sport)
-                                    st.download_button("📄 DOWNLOAD RICH REPORT (WORD)", docx_file, f"{sport}_Pro_Analysis.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", width="stretch")
+                                    st.download_button("📄 DOWNLOAD RICH REPORT (WORD)", docx_file, f"{sport}_Pro_Analysis.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", use_container_width=True)
 
                                     # Pro PDF Download
                                     try:
                                         pdf_file = create_pdf_report(report_text, sport)
-                                        st.download_button("📜 DOWNLOAD PROFESSIONAL PDF REPORT", pdf_file, f"{sport}_Pro_Analysis.pdf", "application/pdf", width="stretch")
+                                        st.download_button("📜 DOWNLOAD PROFESSIONAL PDF REPORT", pdf_file, f"{sport}_Pro_Analysis.pdf", "application/pdf", use_container_width=True)
                                     except Exception as pdf_err:
                                         st.error(f"❌ PDF Rendering Issue: {str(pdf_err)}")
 
@@ -976,19 +1009,52 @@ for i, tab in enumerate(tabs):
                 if metrics:
                     kpis = generate_sport_kpis(metrics, sport, s['d1']['raw'])
                     insights = get_actionable_insights(kpis, sport)
+                    
+                    # Dynamic calculations
+                    speed_key = "wrist_speed"
+                    if any(s in sport for s in ["SOCCER", "ATHLETICS", "FOOTBALL"]):
+                        speed_key = "ankle_speed"
+                    max_v = max([v for v in metrics[speed_key] if v is not None] or [0])
+                    v_label = "Elite" if max_v > 20 else ("Optimal" if max_v > 10 else "Developing")
+                    
+                    # Dashboard Calculation Refactor
+                    lateral_lean_at_impact = metrics["trunk_lateral_lean"][sl1] if "trunk_lateral_lean" in metrics and sl1 < len(metrics["trunk_lateral_lean"]) else 0
+                    efficiency = max(0, min(100, 100 - (abs(lateral_lean_at_impact) * 3)))
+                    eff_label = "Elite" if efficiency > 85 else "Optimal"
+                    
                     m1, m2, m3 = st.columns(3)
-                    with m1: draw_modern_metric("Max Velocity", f"{max([v for v in metrics['wrist_speed'] if v is not None] or [0]):.1f}m/s", "+12%", "⚡")
+                    with m1: draw_modern_metric("Max Velocity", f"{max_v:.1f}m/s", v_label, "⚡")
                     with m2:
-                        if sport == "GYM 🏋️": draw_modern_metric("Squat Depth", f"{kpis.get('depth_ratio', 0):.2f}", "-5%", "📏")
-                        elif sport == "GOLF ⛳": draw_modern_metric("X-Factor", f"{kpis.get('max_x_factor', 0):.1f}°", "+8%", "🔄")
-                        elif sport == "YOGA 🧘": draw_modern_metric("Stability", f"{kpis.get('stability', 0)*100:.1f}%", "+1%", "🧘")
-                        else: draw_modern_metric("Avg Tempo", "2.1s", "+0.2s", "⏱️")
-                    with m3: draw_modern_metric("Consistency", "94%", "+2%", "🎯")
+                        if "GYM" in sport: 
+                            depth = kpis.get('depth_ratio', 0)
+                            d_label = "Elite" if depth < 0.8 else "Developing"
+                            draw_modern_metric("Squat Depth", f"{depth:.2f}", d_label, "📏")
+                        elif "GOLF" in sport: 
+                            xf = kpis.get('max_x_factor', 0)
+                            xf_label = "Elite" if xf > 40 else "Developing"
+                            draw_modern_metric("X-Factor", f"{xf:.1f}°", xf_label, "🔄")
+                        elif "YOGA" in sport: 
+                            stab = kpis.get('stability', 0)*100
+                            s_label = "Elite" if stab > 95 else "Optimal"
+                            draw_modern_metric("Stability", f"{stab:.1f}%", s_label, "🧘")
+                        elif any(s in sport for s in ["SOCCER", "BASEBALL"]):
+                            linkage = kpis.get("linkage_score", 0)
+                            l_label = "Elite" if linkage == 100 else "Optimal"
+                            draw_modern_metric("Kinetic Linkage", f"{linkage}/100", l_label, "⛓️")
+                        elif any(s in sport for s in ["MARTIAL ARTS", "BOXING"]):
+                            snap = kpis.get("impact_snap", 0)
+                            sn_label = "Elite" if snap > 15 else "Optimal"
+                            draw_modern_metric("Impact Snap", f"{snap:.1f}", sn_label, "🥊")
+                        else: 
+                            duration = s['d1']['total'] / s['d1']['fps']
+                            draw_modern_metric("Movement Duration", f"{duration:.1f}s", "Consistent", "⏱️")
+                    with m3: draw_modern_metric("Bio-Efficiency", f"{efficiency:.0f}%", eff_label, "🧬")
+                    
                     st.markdown("<div style='margin-top: 20px;'>", unsafe_allow_html=True)
                     for insight in insights: st.success(insight)
                     st.markdown("</div>", unsafe_allow_html=True)
                     ch1, ch2 = st.columns(2)
-                    with ch1: st.plotly_chart(plot_power_curve(metrics), width="stretch")
-                    with ch2: st.plotly_chart(plot_radar_chart(metrics), width="stretch")
+                    with ch1: st.plotly_chart(plot_power_curve(metrics), use_container_width=True)
+                    with ch2: st.plotly_chart(plot_radar_chart(metrics), use_container_width=True)
                     RACKET_BAT = ["TENNIS 🎾", "PADEL 🎾", "PICKLEBALL 🥒", "BADMINTON 🏸", "CRICKET 🏏", "GOLF ⛳"]
-                    if sport in RACKET_BAT: st.plotly_chart(plot_kinetic_chain(metrics), width="stretch")
+                    if sport in RACKET_BAT: st.plotly_chart(plot_kinetic_chain(metrics), use_container_width=True)
