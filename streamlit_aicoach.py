@@ -281,7 +281,7 @@ st.markdown("""
     
     /* Inject your custom name */
     [data-testid="stFileUploader"] section button div::before {
-        content: "_                     _"; /* Replace this with " " if you want it empty */
+        content: "_                _"; /* Replace this with " " if you want it empty */
         font-size: 14px !important;
         font-family: 'Bitcount Prop Single', sans-serif !important;
         text-transform: uppercase;
@@ -827,11 +827,117 @@ SPORT_CONFIG = {
 st.markdown("<h1>Vector Victor AI</h1>", unsafe_allow_html=True)
 st.markdown("<p class='hero-sub'>Deep form Vector based Bio mechanics AI engine</p>", unsafe_allow_html=True)
 
-# Tabs Navigation
-tab1, tab2, tab3 = st.tabs(["UPLOAD", "ANALYZE", "RESULTS"])
+# --- APP NAVIGATION STATE ---
+if "current_tab" not in st.session_state:
+    st.session_state["current_tab"] = "UPLOAD"
+
+st.markdown("""
+    <style>
+    @import url('https://fonts.googleapis.com/css2?family=Bitcount+Prop+Single&display=swap');
+    :root {
+        --neon-green: #ccff00;
+        --glass-bg: rgba(255, 255, 255, 0.05);
+        --glass-border: rgba(255, 255, 255, 0.1);
+    }
+    
+    /* Global Font Override */
+    .stApp, .stApp * { 
+        font-family: 'Bitcount Prop Single', sans-serif !important; 
+    }
+    
+    /* Global Uppercase for Interactive Elements */
+    button, label, input, select, textarea, .hero-sub, h4, [data-testid="stWidgetLabel"] p { 
+        text-transform: uppercase !important;
+    }
+
+    /* Standardise File Uploader - Reset to Defaults to fix overlap */
+    [data-testid="stFileUploader"], [data-testid="stFileUploader"] * {
+        font-family: sans-serif !important;
+        text-transform: none !important;
+    }
+
+    .stApp { background: radial-gradient(circle at top right, #0f172a, #020617); color: #f8fafc; }
+    .main { padding: 1rem 0.5rem; }
+    
+    /* Button Styling */
+    button { 
+        min-height: 48px !important;
+        font-size: 14px !important;
+    }
+    .stButton > button { width: 100% !important; }
+
+    /* Custom Radio Tab Bar Styling */
+    div[data-testid="stRadio"] > label { display: none; }
+    div[data-testid="stRadio"] > div {
+        flex-direction: row;
+        justify-content: center;
+        gap: 0.5rem;
+        background: transparent;
+        padding-bottom: 2rem;
+    }
+    div[data-testid="stRadio"] input[type="radio"] { display: none; }
+    div[data-testid="stRadio"] div[role="radiogroup"] > label {
+        flex: 1;
+        min-width: 80px;
+        text-align: center;
+        height: 50px;
+        background: rgba(255, 255, 255, 0.05) !important;
+        border-radius: 10px !important;
+        border: 1px solid rgba(255,255,255,0.1) !important;
+        padding: 10px !important;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    div[data-testid="stRadio"] div[role="radiogroup"] > label p {
+        font-size: 0.9rem !important;
+        font-weight: 700 !important;
+        letter-spacing: 1px;
+        margin: 0 !important;
+    }
+    div[data-testid="stRadio"] div[role="radiogroup"] > label:has(input:checked) {
+        background: rgba(204, 255, 0, 0.1) !important;
+        border: 1px solid var(--neon-green) !important;
+    }
+    div[data-testid="stRadio"] div[role="radiogroup"] > label:has(input:checked) p {
+        color: var(--neon-green) !important;
+    }
+
+    .stSlider { padding: 1rem 0; }
+    [data-testid="column"] { padding: 0 0.25rem; }
+    div[data-testid="stSlider"] label p { color: var(--neon-green) !important; font-weight: 900 !important; font-size: 1rem !important; letter-spacing: 1px; }
+    div[data-testid="stThumbValue"] { color: #000 !important; background-color: var(--neon-green) !important; font-weight: 900 !important; }
+    div[data-baseweb="slider"] > div { background: var(--neon-green) !important; }
+    
+    .glass-card { background: var(--glass-bg); backdrop-filter: blur(12px); border: 1px solid var(--glass-border); border-radius: 24px; padding: 1.5rem; margin-bottom: 2rem; }
+    .bento-card { background: rgba(255, 255, 255, 0.03); border: 1px solid var(--glass-border); border-radius: 20px; padding: 20px; text-align: center; margin-bottom: 10px; }
+
+    /* Heading Styling */
+    h1 { font-size: clamp(2rem, 8vw, 4rem) !important; font-weight: normal !important; background: linear-gradient(to right, #00f2fe, #4facfe); -webkit-background-clip: text; -webkit-text-fill-color: transparent; text-align: center; margin-bottom: 0px !important; text-transform: uppercase !important; }
+    h4 { font-size: 0.85rem !important; font-weight: 700 !important; color: var(--neon-green); margin-top: 2.5rem !important; margin-bottom: 0.5rem !important; letter-spacing: 2px; }
+    .hero-sub { text-align: center; color: #94a3b8; font-size: 0.7rem; letter-spacing: 4px; margin-bottom: 2rem; }
+
+    /* Specific Button Highlighting */
+    div.stButton > button:has(div:contains("GENERATE AI COACHING REPORT")) { background: linear-gradient(135deg, #ffd700 0%, #daa520 50%, #b8860b 100%) !important; color: #000 !important; font-weight: 900 !important; }
+    </style>
+    """, unsafe_allow_html=True)
+
+# App Header
+st.markdown("<h1>Vector Victor AI</h1>", unsafe_allow_html=True)
+st.markdown("<p class='hero-sub'>Deep form Vector based Bio mechanics AI engine</p>", unsafe_allow_html=True)
+
+# Tabs Navigation using Radio (supports programmatic switching)
+tab_options = ["UPLOAD", "ANALYZE", "RESULTS"]
+selected_tab = st.radio("NAVIGATION", tab_options, index=tab_options.index(st.session_state["current_tab"]), horizontal=True, key="nav_radio")
+
+# Update state if user manually clicks
+if selected_tab != st.session_state["current_tab"]:
+    st.session_state["current_tab"] = selected_tab
+    st.rerun()
 
 # Tab 1: Upload
-with tab1:
+if st.session_state["current_tab"] == "UPLOAD":
     st.markdown("#### UPLOAD VIDEOS", unsafe_allow_html=True)
     selected_sport = st.selectbox("SELECT SPORT", list(SPORT_CONFIG.keys()), key="sport_sel")
     selected_action = st.selectbox("SELECT ACTION", SPORT_CONFIG[selected_sport], key="action_sel")
@@ -868,14 +974,20 @@ with tab1:
                 
                 st.session_state["data_current"] = {"d1": d1, "d2": d2, "p1": t1_p, "p2": t2_p}
                 status.update(label="INITIAL ANALYSIS COMPLETE!", state="complete")
+            
+            # AUTOMATIC SWITCH TO ANALYZE TAB
+            st.session_state["current_tab"] = "ANALYZE"
             st.rerun()
     else:
         st.info("📌 UPLOAD A VIDEO TO START.")
 
 # Tab 2: Analyze
-with tab2:
+elif st.session_state["current_tab"] == "ANALYZE":
     if "data_current" not in st.session_state:
         st.warning("⚠️ UPLOAD AND PROCESS A VIDEO FIRST.")
+        if st.button("GO TO UPLOAD"):
+            st.session_state["current_tab"] = "UPLOAD"
+            st.rerun()
     else:
         s = st.session_state["data_current"]
         sport, action = st.session_state["sport"], st.session_state["action"]
@@ -915,12 +1027,18 @@ with tab2:
                 tele_opt = build_pro_telemetry(raw_interp, sport, action, sl1, s['d1']['fps'], "dual" if s['p2'] else "lead")
                 st.session_state["brief"] = generate_brief(tele_opt)
                 st.session_state["sl1_val"] = sl1 # For efficiency calc
+            
+            # AUTOMATIC SWITCH TO RESULTS TAB
+            st.session_state["current_tab"] = "RESULTS"
             st.rerun()
 
 # Tab 3: Results
-with tab3:
+elif st.session_state["current_tab"] == "RESULTS":
     if "final_video" not in st.session_state:
         st.warning("⚠️ COMPLETE THE SYNCHRONIZATION AND RENDER FIRST.")
+        if st.button("GO TO ANALYZE"):
+            st.session_state["current_tab"] = "ANALYZE"
+            st.rerun()
     else:
         s = st.session_state["data_current"]
         sport, action = st.session_state["sport"], st.session_state["action"]
@@ -973,4 +1091,5 @@ with tab3:
 
         if st.button("↺ ANALYZE ANOTHER VIDEO", use_container_width=True):
             for key in list(st.session_state.keys()): del st.session_state[key]
+            st.session_state["current_tab"] = "UPLOAD"
             st.rerun()
