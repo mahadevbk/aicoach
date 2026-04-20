@@ -263,35 +263,23 @@ st.markdown("""
         --glass-border: rgba(255, 255, 255, 0.1);
     }
     
-    /* Global Font Override */
+    /* Global Font & Uppercase Override */
     .stApp, .stApp * { 
         font-family: 'Bitcount Prop Single', sans-serif !important; 
+        font-weight: normal !important;
     }
     
     /* Global Uppercase for Interactive Elements */
-    button, label, input, select, textarea, .stTabs [data-baseweb="tab"] p, .hero-sub, h4 { 
+    button, label, input, select, textarea, .stTabs [data-baseweb="tab"] p, .hero-sub, h4, [data-testid="stWidgetLabel"] p { 
         text-transform: uppercase !important;
+        font-weight: normal !important;
     }
 
     /* Standardise File Uploader - Keep Font, Fix Overlap by disabling uppercase */
-     /* Target the 'Browse files' button text */
-    [data-testid="stFileUploader"] section button div {
-        font-size: 0 !important; /* Hides the original 'Browse files' text */
+    [data-testid="stFileUploader"] * {
+        text-transform: none !important;
+        font-weight: normal !important;
     }
-    
-    /* Inject your custom name */
-    [data-testid="stFileUploader"] section button div::before {
-        content: "_                _"; /* Replace this with " " if you want it empty */
-        font-size: 14px !important;
-        font-family: 'Bitcount Prop Single', sans-serif !important;
-        text-transform: uppercase;
-        visibility: visible;
-    }
-
-/* Remove the 'Limit 200MB' and original filename helper text if you want a cleaner look */
-[data-testid="stFileUploader"] section > div {
-    display: none !important;
-}
     
     .stApp { background: radial-gradient(circle at top right, #0f172a, #020617); color: #f8fafc; }
     .main { padding: 1rem 0.5rem; }
@@ -300,6 +288,7 @@ st.markdown("""
     button { 
         min-height: 48px !important;
         font-size: 14px !important;
+        font-weight: normal !important;
     }
     .stButton > button { width: 100% !important; }
 
@@ -311,13 +300,13 @@ st.markdown("""
         border: 1px solid rgba(255,255,255,0.1) !important;
     }
     .stTabs [aria-selected="true"] { background: rgba(204, 255, 0, 0.1) !important; border: 1px solid var(--neon-green) !important; }
-    .stTabs [aria-selected="true"] p { color: var(--neon-green) !important; font-weight: 700 !important; }
+    .stTabs [aria-selected="true"] p { color: var(--neon-green) !important; font-weight: normal !important; }
 
     /* Slider & Column Styling */
     .stSlider { padding: 1rem 0; }
     [data-testid="column"] { padding: 0 0.25rem; }
-    div[data-testid="stSlider"] label p { color: var(--neon-green) !important; font-weight: 900 !important; font-size: 1rem !important; letter-spacing: 1px; }
-    div[data-testid="stThumbValue"] { color: #000 !important; background-color: var(--neon-green) !important; font-weight: 900 !important; }
+    div[data-testid="stSlider"] label p { color: var(--neon-green) !important; font-size: 1rem !important; letter-spacing: 1px; font-weight: normal !important; }
+    div[data-testid="stThumbValue"] { color: #000 !important; background-color: var(--neon-green) !important; font-weight: normal !important; }
     div[data-baseweb="slider"] > div { background: var(--neon-green) !important; }
     
     /* Card Styling */
@@ -326,11 +315,11 @@ st.markdown("""
 
     /* Heading Styling */
     h1 { font-size: clamp(2rem, 8vw, 4rem) !important; font-weight: normal !important; background: linear-gradient(to right, #00f2fe, #4facfe); -webkit-background-clip: text; -webkit-text-fill-color: transparent; text-align: center; margin-bottom: 0px !important; text-transform: uppercase !important; }
-    h4 { font-size: 0.85rem !important; font-weight: 700 !important; color: var(--neon-green); margin-top: 2.5rem !important; margin-bottom: 0.5rem !important; letter-spacing: 2px; }
-    .hero-sub { text-align: center; color: #94a3b8; font-size: 0.7rem; letter-spacing: 4px; margin-bottom: 2rem; }
+    h4 { font-size: 0.85rem !important; color: var(--neon-green); margin-top: 2.5rem !important; margin-bottom: 0.5rem !important; letter-spacing: 2px; font-weight: normal !important; }
+    .hero-sub { text-align: center; color: #94a3b8; font-size: 0.7rem; letter-spacing: 4px; margin-bottom: 2rem; font-weight: normal !important; }
 
     /* Specific Button Highlighting */
-    div.stButton > button:has(div:contains("GENERATE AI COACHING REPORT")) { background: linear-gradient(135deg, #ffd700 0%, #daa520 50%, #b8860b 100%) !important; color: #000 !important; font-weight: 900 !important; }
+    div.stButton > button:has(div:contains("GENERATE AI COACHING REPORT")) { background: linear-gradient(135deg, #ffd700 0%, #daa520 50%, #b8860b 100%) !important; color: #000 !important; font-weight: normal !important; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -824,8 +813,8 @@ SPORT_CONFIG = {
 }
 
 # App Header
-#st.markdown("<h1>Vector Victor AI</h1>", unsafe_allow_html=True)
-#st.markdown("<p class='hero-sub'>Deep form Vector based Bio mechanics AI engine</p>", unsafe_allow_html=True)
+st.markdown("<h1>Vector Victor AI</h1>", unsafe_allow_html=True)
+st.markdown("<p class='hero-sub'>Deep form Vector based Bio mechanics AI engine</p>", unsafe_allow_html=True)
 
 # Setup Gemini
 if "GEMINI_API_KEY" in st.secrets:
