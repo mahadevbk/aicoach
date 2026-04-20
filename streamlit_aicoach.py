@@ -878,7 +878,7 @@ for i, tab in enumerate(tabs):
             is_stereo = st.toggle("Stereographic Mode", value=False, key=f"st_{sport}")
             u1 = st.file_uploader("Source 1", type=["mp4","mov"], key=f"u1_{sport}")
             u2 = st.file_uploader("Source 2", type=["mp4","mov"], key=f"u2_{sport}") if is_stereo else None
-            sel_act = st.selectbox("Action", actions, key=f"act_{sport}")
+            sel_act = action # Reuse the action variable defined in the same loop context.
             if st.button("RUN PRO ANALYSIS", key=f"run_{sport}", width="stretch"):
                 model_task = download_model()
                 t1_p = os.path.join(tempfile.gettempdir(), f"l_{sport}.mp4")
