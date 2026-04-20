@@ -929,7 +929,7 @@ with tab1:
         if u2: display_file_info(u2)
 
     if u1:
-        if st.button("PROCEED TO ANALYSIS", type="primary", use_container_width=True):
+        if st.button("PROCEED TO ANALYSIS", type="primary", width="stretch"):
             st.session_state["u1"] = u1
             st.session_state["u2"] = u2
             st.session_state["sport"] = selected_sport
@@ -987,11 +987,11 @@ with tab2:
                     i2 = cv2.cvtColor(i2, cv2.COLOR_BGR2RGB)
                     h_t = 400
                     w1_n, w2_n = int(i1.shape[1] * (h_t / i1.shape[0])), int(i2.shape[1] * (h_t / i2.shape[0]))
-                    st.image(np.hstack((cv2.resize(i1, (w1_n, h_t)), cv2.resize(i2, (w2_n, h_t)))), use_container_width=True)
+                    st.image(np.hstack((cv2.resize(i1, (w1_n, h_t)), cv2.resize(i2, (w2_n, h_t)))), width="stretch")
             else:
-                st.image(i1, use_container_width=True)
+                st.image(i1, width="stretch")
 
-        if st.button("🚀 START FINAL BIOMECHANICAL RENDER", type="primary", use_container_width=True):
+        if st.button("🚀 START FINAL BIOMECHANICAL RENDER", type="primary", width="stretch"):
             with st.spinner("PROCESSING VECTORS..."):
                 final_v = render_pro_stereo(s['p1'], s['p2'], s['d1']['history'], (s['d2']['history'] if s['d2'] else []), sl1, sl2, s['d1']['fps'])
                 st.session_state["final_video"] = final_v
@@ -1029,9 +1029,9 @@ with tab3:
             st.markdown("---")
             st.markdown("#### DETAILED ANALYTICS")
             chart_view = st.radio("CHOOSE VIEW", ["POWER CURVE", "RADAR CHART", "KINETIC CHAIN"], horizontal=True, label_visibility="collapsed")
-            if chart_view == "POWER CURVE": st.plotly_chart(plot_power_curve(metrics), use_container_width=True)
-            elif chart_view == "RADAR CHART": st.plotly_chart(plot_radar_chart(metrics), use_container_width=True)
-            else: st.plotly_chart(plot_kinetic_chain(metrics), use_container_width=True)
+            if chart_view == "POWER CURVE": st.plotly_chart(plot_power_curve(metrics), width="stretch")
+            elif chart_view == "RADAR CHART": st.plotly_chart(plot_radar_chart(metrics), width="stretch")
+            else: st.plotly_chart(plot_kinetic_chain(metrics), width="stretch")
             
             # --- DOWNLOADS & EXPORTS ---
             st.markdown("#### DOWNLOADS & EXPORT")
@@ -1041,10 +1041,10 @@ with tab3:
             with zipfile.ZipFile(z_buf, "w") as zf:
                 zf.write(st.session_state["final_video"], "analysis.mp4")
                 zf.writestr("AI_BRIEF.txt", st.session_state["brief"])
-            st.download_button("📥 DOWNLOAD ZIP (VIDEO + DATA)", z_buf.getvalue(), f"{sport}_DATA.zip", use_container_width=True)
+            st.download_button("📥 DOWNLOAD ZIP (VIDEO + DATA)", z_buf.getvalue(), f"{sport}_DATA.zip", width="stretch")
             
             st.markdown("---")
-            if st.button("🤖 GENERATE AI COACHING REPORT", type="primary", use_container_width=True):
+            if st.button("🤖 GENERATE AI COACHING REPORT", type="primary", width="stretch"):
                 with st.status("AI IS ANALYZING...") as status:
                     report_text = generate_pro_report(st.session_state["brief"])
                     st.session_state["report_text"] = report_text
@@ -1056,11 +1056,11 @@ with tab3:
                 c1, c2 = st.columns(2)
                 with c1:
                     docx_f = create_docx_report(st.session_state["report_text"], sport)
-                    st.download_button("📄 WORD DOC", docx_f, f"{sport}_ANALYSIS.docx", use_container_width=True)
+                    st.download_button("📄 WORD DOC", docx_f, f"{sport}_ANALYSIS.docx", width="stretch")
                 with c2:
                     pdf_f = create_pdf_report(st.session_state["report_text"], sport)
-                    st.download_button("📜 PDF REPORT", pdf_f, f"{sport}_ANALYSIS.pdf", use_container_width=True)
+                    st.download_button("📜 PDF REPORT", pdf_f, f"{sport}_ANALYSIS.pdf", width="stretch")
 
-        if st.button("↺ ANALYZE ANOTHER VIDEO", use_container_width=True):
+        if st.button("↺ ANALYZE ANOTHER VIDEO", width="stretch"):
             for key in list(st.session_state.keys()): del st.session_state[key]
             st.rerun()
