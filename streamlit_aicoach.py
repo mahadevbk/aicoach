@@ -767,7 +767,7 @@ st.markdown("<p class='hero-sub'>Deep form Vector and Bio mechanics AI engine</p
 
 SPORT_CONFIG = {
     "TENNIS 🎾": ["Serve", "Forehand", "Backhand"], "PADEL 🎾": ["Bandeja", "Vibora", "Smash"],
-    "PICKLEBALL 🥒": ["Dink", "Third Shot Drop", "Volley"], "GOLF ⛳": ["Driver", "Iron", "Putter"],
+    "PICKLEBALL 🥒": ["Serve", "Dink", "Third Shot Drop", "Volley"], "GOLF ⛳": ["Driver", "Iron", "Putter"],
     "BADMINTON 🏸": ["Smash", "Drop Shot", "Clear"], "CRICKET 🏏": ["Drive", "Bowling", "Pull Shot"],
     "GYM 🏋️": ["Squat", "Deadlift", "Bench Press"], "YOGA 🧘": ["Warrior", "Tree Pose", "Sun Salutation"]
 }
@@ -819,11 +819,13 @@ for i, (sport, actions) in enumerate(SPORT_CONFIG.items()):
                     sl1 = st.slider("Source 1 Frame", 0, s['d1']['total']-1, s['d1']['impact'], key=f"sl1_{sport}")
                     sl2 = st.slider("Source 2 Frame", 0, (s['d2']['total']-1 if s['d2'] else 0), (s['d2']['impact'] if s['d2'] else 0), key=f"sl2_{sport}") if s['d2'] else 0
                     
-                    cap1 = cv2.VideoCapture(s['p1']); cap1.set(1, sl1); _, i1 = cap1.read(); cap1.release()
-                    i1 = cv2.cvtColor(i1, cv2.COLOR_BGR2RGB)
+                    cap1 = cv2.VideoCapture(s['p1']); cap1.set(1, sl1); ret1, i1 = cap1.read(); cap1.release()
+                    if ret1 and i1 is not None:
+                        i1 = cv2.cvtColor(i1, cv2.COLOR_BGR2RGB)
                     if s['p2']:
-                        cap2 = cv2.VideoCapture(s['p2']); cap2.set(1, sl2); _, i2 = cap2.read(); cap2.release()
-                        i2 = cv2.cvtColor(i2, cv2.COLOR_BGR2RGB)
+                        cap2 = cv2.VideoCapture(s['p2']); cap2.set(1, sl2); ret2, i2 = cap2.read(); cap2.release()
+                        if ret2 and i2 is not None:
+                            i2 = cv2.cvtColor(i2, cv2.COLOR_BGR2RGB)
                         h1, w1 = i1.shape[:2]; h2, w2 = i2.shape[:2]
                         h_target = int(min(h1, h2) * 0.5)
                         w1_new, w2_new = int(w1 * (h_target / h1)), int(w2 * (h_target / h2))
