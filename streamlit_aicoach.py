@@ -263,9 +263,13 @@ st.markdown("""
         --glass-border: rgba(255, 255, 255, 0.1);
     }
     
-    /* Global Font & Uppercase Override */
-    .stApp, button, label, input, select, textarea, .stTabs [data-baseweb="tab"] p { 
+    /* Global Font Override */
+    .stApp, .stApp * { 
         font-family: 'Bitcount Prop Single', sans-serif !important; 
+    }
+    
+    /* Global Uppercase for Interactive Elements */
+    button, label, input, select, textarea, .stTabs [data-baseweb="tab"] p, .hero-sub, h4 { 
         text-transform: uppercase !important;
     }
 
