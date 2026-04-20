@@ -278,6 +278,15 @@ st.markdown("""
         font-family: sans-serif !important;
         text-transform: none !important;
     }
+    [data-testid="stFileUploader"] button {
+        min-height: unset !important;
+        height: auto !important;
+        line-height: normal !important;
+        width: auto !important;
+    }
+    [data-testid="stFileUploader"] section {
+        padding: 0 !important;
+    }
     
     .stApp { background: radial-gradient(circle at top right, #0f172a, #020617); color: #f8fafc; }
     .main { padding: 1rem 0.5rem; }
