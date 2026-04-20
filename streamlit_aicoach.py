@@ -281,7 +281,7 @@ st.markdown("""
     
     /* Inject your custom name */
     [data-testid="stFileUploader"] section button div::before {
-        content: "_                _"; /* Replace this with " " if you want it empty */
+        content: "_                     _"; /* Replace this with " " if you want it empty */
         font-size: 14px !important;
         font-family: 'Bitcount Prop Single', sans-serif !important;
         text-transform: uppercase;
