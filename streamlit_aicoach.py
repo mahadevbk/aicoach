@@ -1042,11 +1042,11 @@ def render_pro_stereo(p1, p2, h1, h2, f1, f2, fps):
 # ============================================================================
 
 SPORT_CONFIG = {
-    "TENNIS 🎾": ["First Serve", "Second Serve", "Forehand Flat", "Forehand Topspin", "Forehand Slice", "Backhand One-Handed", "Backhand Two-Handed", "Backhand Slice", "Forehand Volley", "Backhand Volley", "Overhead Smash", "Drop Shot", "Lob", "Return of Serve"],
-    "PADEL 🎾": ["Serve", "Forehand Groundstroke", "Backhand Groundstroke", "Bandeja", "Vibora", "Flat Smash", "Smash 'por 3'", "Smash 'por 4'", "Forehand Volley", "Backhand Volley", "Bajada de Pared", "Chiquita", "Globo (Lob)", "Contrapared"],
-    "PICKLEBALL 🥒": ["Serve (Volley)", "Serve (Drop)", "Dink (Straight)", "Dink (Cross-court)", "Third Shot Drop", "Third Shot Drive", "Speed Up", "Kitchen Volley", "Punch Volley", "Overhead Slam", "Reset Shot", "Backhand Flick", "Lob"],
+    "TENNIS 🎾": ["General Rally", "First Serve", "Second Serve", "Forehand Flat", "Forehand Topspin", "Forehand Slice", "Backhand One-Handed", "Backhand Two-Handed", "Backhand Slice", "Forehand Volley", "Backhand Volley", "Overhead Smash", "Drop Shot", "Lob", "Return of Serve"],
+    "PADEL 🎾": ["General Rally", "Serve", "Forehand Groundstroke", "Backhand Groundstroke", "Bandeja", "Vibora", "Flat Smash", "Smash 'por 3'", "Smash 'por 4'", "Forehand Volley", "Backhand Volley", "Bajada de Pared", "Chiquita", "Globo (Lob)", "Contrapared"],
+    "PICKLEBALL 🥒": ["General Rally", "Serve (Volley)", "Serve (Drop)", "Dink (Straight)", "Dink (Cross-court)", "Third Shot Drop", "Third Shot Drive", "Speed Up", "Kitchen Volley", "Punch Volley", "Overhead Slam", "Reset Shot", "Backhand Flick", "Lob"],
     "GOLF ⛳": ["Driver Tee Shot", "Fairway Wood", "Long Iron", "Short Iron", "Pitch Shot", "Chipping", "Sand Bunker Shot", "Putter Stroke", "Full Backswing", "Downswing Transition", "Follow Through"],
-    "BADMINTON 🏸": ["High Serve", "Low Serve", "Flick Serve", "Forehand Smash", "Backhand Smash", "Jump Smash", "Clear (Lob)", "Drop Shot", "Net Kill", "Net Lift", "Drive Shot", "Around-the-head Shot"],
+    "BADMINTON 🏸": ["General Rally", "High Serve", "Low Serve", "Flick Serve", "Forehand Smash", "Backhand Smash", "Jump Smash", "Clear (Lob)", "Drop Shot", "Net Kill", "Net Lift", "Drive Shot", "Around-the-head Shot"],
     "CRICKET 🏏": ["Forward Defense", "Cover Drive", "Pull Shot", "Hook Shot", "Cut Shot", "Sweep Shot", "Fast Bowling Action", "Spin Bowling Action", "Wicket-keeping Stance", "Power Hitting (Slog)", "High Catching"],
     "SOCCER ⚽": ["Instep Drive (Power)", "Side-foot Pass", "Curled Shot", "Long Ball/Switch", "Heading (Standing)", "Heading (Jumping)", "Goalkeeper Dive", "Goalkeeper Goal Kick", "Throw-in", "Penalty Kick", "Volley", "First Touch Control"],
     "BASKETBALL 🏀": ["Jump Shot", "Three-Pointer", "Free Throw", "Layup (Right/Left)", "Driving Dunk", "Chest Pass", "Bounce Pass", "Overhead Pass", "Defensive Slide", "Post-up Turnaround", "Rebounding Box-out"],
