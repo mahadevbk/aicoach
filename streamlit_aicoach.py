@@ -20,6 +20,10 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH
 from fpdf import FPDF
 from fpdf.enums import XPos, YPos
 
+# ============================================================================
+# 1. CORE UTILITIES & ENCODERS
+# ============================================================================
+
 class NumpyEncoder(json.JSONEncoder):
     def default(self, obj):
         if isinstance(obj, np.integer): return int(obj)
@@ -28,11 +32,13 @@ class NumpyEncoder(json.JSONEncoder):
         if isinstance(obj, np.bool_): return bool(obj)
         return super(NumpyEncoder, self).default(obj)
 
+# ============================================================================
+# 2. REPORT GENERATION FUNCTIONS (Original)
+# ============================================================================
+
 def generate_pro_report(brief_content):
-    # Auto-discover the best available model to avoid 404/NotFound errors
     try:
         supported_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-        #priority = ['models/gemini-1.5-flash', 'models/gemini-1.5-flash-latest', 'models/gemini-pro']
         priority = ['models/gemini-1.5-pro', 'models/gemini-1.5-flash']
         selected_model = next((p for p in priority if p in supported_models), supported_models[0] if supported_models else None)
             
@@ -54,13 +60,10 @@ def generate_pro_report(brief_content):
 
 def create_docx_report(text, sport_name):
     doc = Document()
-    
-    # Global Styles
     style = doc.styles['Normal']
     style.font.name = 'Bitcount Prop Single'
     style.font.size = Pt(11)
     
-    # Title
     header = doc.add_heading("VECTOR VICTOR AI", 0)
     header.alignment = WD_ALIGN_PARAGRAPH.CENTER
     if header.runs:
@@ -78,18 +81,14 @@ def create_docx_report(text, sport_name):
     doc.add_paragraph(f"Sport: {sport_name} | Date: {time.strftime('%Y-%m-%d')}")
     doc.add_paragraph("_" * 50)
 
-    # State machine for table parsing
     lines = text.split('\n')
     table_data = []
     in_table = False
 
     for line in lines:
         clean_line = line.strip()
-        
-        # Table Detection
         if '|' in clean_line:
-            if '---' in clean_line: # Skip separator lines
-                continue
+            if '---' in clean_line: continue
             cells = [c.strip() for c in clean_line.split('|') if c.strip()]
             if cells:
                 table_data.append(cells)
@@ -97,34 +96,26 @@ def create_docx_report(text, sport_name):
             continue
         else:
             if in_table and table_data:
-                # Flush the table to the document
                 doc_table = doc.add_table(rows=len(table_data), cols=len(table_data[0]))
                 doc_table.style = 'Table Grid'
                 for r_idx, row in enumerate(table_data):
                     for c_idx, val in enumerate(row):
                         if c_idx < len(doc_table.columns):
                             doc_table.cell(r_idx, c_idx).text = val
-                doc.add_paragraph() # Add space after table
+                doc.add_paragraph()
                 table_data = []
                 in_table = False
 
-        if not clean_line:
-            continue
-            
-        # Headings
-        if clean_line.startswith('# '):
-            doc.add_heading(clean_line.replace('# ', ''), level=0)
-        elif clean_line.startswith('## '):
-            doc.add_heading(clean_line.replace('## ', ''), level=1)
-        elif clean_line.startswith('### '):
-            doc.add_heading(clean_line.replace('### ', ''), level=2)
+        if not clean_line: continue
+        if clean_line.startswith('# '): doc.add_heading(clean_line.replace('# ', ''), level=0)
+        elif clean_line.startswith('## '): doc.add_heading(clean_line.replace('## ', ''), level=1)
+        elif clean_line.startswith('### '): doc.add_heading(clean_line.replace('### ', ''), level=2)
         elif clean_line.startswith('* ') or clean_line.startswith('- '):
             p = doc.add_paragraph(clean_line[2:], style='List Bullet')
             p.paragraph_format.space_after = Pt(6)
         else:
             p = doc.add_paragraph()
             p.paragraph_format.space_after = Pt(10)
-            # Bold parsing
             if '**' in clean_line:
                 parts = clean_line.split('**')
                 for i, part in enumerate(parts):
@@ -139,18 +130,12 @@ def create_docx_report(text, sport_name):
 
 class PDFReport(FPDF):
     def __init__(self):
-        super().__init__(format='A4') # Force A4 Format
+        super().__init__(format='A4')
         self.custom_font_active = False
-        
-        # Attempt to load custom font
         try:
             font_path = os.path.join(tempfile.gettempdir(), "BitcountPropSingle-Medium.ttf")
             if not os.path.exists(font_path):
-                # Using a direct raw link to a similar styled high-end variable font or public TTF
-                # Note: Bitcount is a commercial/licensed font on some platforms, 
-                # but we will try to load the local system version or a fallback.
                 urllib.request.urlretrieve("https://github.com/google/fonts/raw/main/ofl/robotoflex/RobotoFlex%5BGRAD%2CXOPQ%2CXTRA%2CYOPQ%2CYTLC%2CYTAS%2CYTDE%2CYTFI%2Copsz%2Cslnt%2Cwdth%2Cwght%5D.ttf", font_path)
-            
             self.add_font("CustomFont", "", font_path)
             self.custom_font_active = True
         except:
@@ -158,8 +143,8 @@ class PDFReport(FPDF):
 
     def header(self):
         f_name = "CustomFont" if self.custom_font_active else "helvetica"
-        self.set_font(f_name, '', 22) # Heading 1
-        self.set_text_color(0, 180, 255) # Professional Blue
+        self.set_font(f_name, '', 22)
+        self.set_text_color(0, 180, 255)
         self.cell(0, 15, 'VECTOR VICTOR AI', border=False, align='C', new_x=XPos.LMARGIN, new_y=YPos.NEXT)
         self.set_font(f_name, '', 12)
         self.set_text_color(100, 100, 100)
@@ -185,10 +170,7 @@ def create_pdf_report(text, sport_name):
     pdf = PDFReport()
     pdf.alias_nb_pages()
     pdf.add_page()
-    
     f_main = "CustomFont" if pdf.custom_font_active else "helvetica"
-    
-    # Metadata
     pdf.set_font(f_main, '', 12)
     pdf.set_text_color(0, 0, 0)
     pdf.cell(0, 8, f"Sport: {clean_for_pdf(sport_name)}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
@@ -202,8 +184,6 @@ def create_pdf_report(text, sport_name):
 
     for line in lines:
         clean_line = clean_for_pdf(line.strip())
-        
-        # Table Logic
         if '|' in clean_line:
             if '---' in clean_line: continue
             cells = [c.strip() for c in clean_line.split('|') if c.strip()]
@@ -213,7 +193,6 @@ def create_pdf_report(text, sport_name):
             continue
         else:
             if in_table and table_data:
-                # Render PDF Table
                 pdf.set_font(f_main, '', 9)
                 col_width = (pdf.w - 20) / len(table_data[0])
                 for r_idx, row in enumerate(table_data):
@@ -247,7 +226,6 @@ def create_pdf_report(text, sport_name):
             if '**' in clean_line:
                 parts = clean_line.split('**')
                 for idx_p, part in enumerate(parts):
-                    # Manual toggle for bold weight simulation if using standard font
                     if not pdf.custom_font_active:
                         if idx_p % 2 == 1: pdf.set_font(f_main, 'B', 10)
                         else: pdf.set_font(f_main, '', 10)
@@ -258,14 +236,23 @@ def create_pdf_report(text, sport_name):
 
     return bytes(pdf.output())
 
-# --- 1. FULL PREMIUM UI ---
-st.set_page_config(page_title="Vector Victor AI Skeletonkey", page_icon="🎾", layout="wide", initial_sidebar_state="collapsed")
+# ============================================================================
+# 3. PAGE CONFIG & MOBILE CSS
+# ============================================================================
+
+st.set_page_config(
+    page_title="Vector Victor AI Skeletonkey", 
+    page_icon="🎾", 
+    layout="wide", 
+    initial_sidebar_state="collapsed"
+)
+
+# Setup Gemini
+if "GEMINI_API_KEY" in st.secrets:
+    genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
 
 import plotly.graph_objects as go
 import plotly.express as px
-
-# Setup
-genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
 
 st.markdown("""
     <style>
@@ -273,18 +260,40 @@ st.markdown("""
     @import url('https://fonts.googleapis.com/css2?family=Bitcount+Prop+Single&display=swap');
     :root {
         --neon-green: #ccff00;
-        --matrix-green: #00FF41;
         --glass-bg: rgba(255, 255, 255, 0.05);
         --glass-border: rgba(255, 255, 255, 0.1);
     }
     .stApp { background: radial-gradient(circle at top right, #0f172a, #020617); color: #f8fafc; font-family: 'Roboto Flex', sans-serif; }
     
-    /* Glassmorphism Sidebar */
-    [data-testid="stSidebar"] {
-        background-color: rgba(15, 23, 42, 0.8) !important;
-        backdrop-filter: blur(20px);
-        border-right: 1px solid var(--glass-border);
+    .main { padding: 1rem 0.5rem; }
+    
+    button { 
+        width: 100% !important;
+        min-height: 48px !important;
+        font-size: 14px !important;
     }
+    
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 0.5rem;
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+    
+    .stTabs [data-baseweb="tab"] {
+        flex: 1;
+        min-width: 80px;
+        text-align: center;
+        height: 50px; 
+        background: rgba(255, 255, 255, 0.05) !important; 
+        border-radius: 10px !important; 
+        border: 1px solid rgba(255,255,255,0.1) !important;
+    }
+    .stTabs [aria-selected="true"] { background: rgba(204, 255, 0, 0.1) !important; border: 1px solid var(--neon-green) !important; }
+    .stTabs [aria-selected="true"] p { color: var(--neon-green) !important; font-weight: 700 !important; }
+
+    .stSlider { padding: 1rem 0; }
+    [data-testid="column"] { padding: 0 0.25rem; }
 
     div[data-testid="stSlider"] label p { color: var(--neon-green) !important; font-weight: 900 !important; font-size: 1.1rem !important; text-transform: uppercase; letter-spacing: 1px; }
     div[data-testid="stThumbValue"] { color: #000 !important; background-color: var(--neon-green) !important; font-weight: 900 !important; }
@@ -297,12 +306,6 @@ st.markdown("""
         border-radius: 24px; 
         padding: 1.5rem; 
         margin-bottom: 2rem; 
-        transition: all 0.3s ease;
-    }
-    .glass-card:hover {
-        transform: translateY(-5px);
-        border-color: var(--neon-green);
-        box-shadow: 0 10px 30px rgba(204, 255, 0, 0.1);
     }
 
     .bento-card {
@@ -311,50 +314,23 @@ st.markdown("""
         border-radius: 20px;
         padding: 20px;
         text-align: center;
-        transition: all 0.3s ease;
-    }
-    .bento-card:hover {
-        border-color: var(--neon-green);
-        box-shadow: 0 4px 20px rgba(204, 255, 0, 0.15);
-        transform: scale(1.02);
+        margin-bottom: 10px;
     }
 
     h1 { font-family: 'Bitcount Prop Single', sans-serif !important; font-size: clamp(2rem, 8vw, 4rem) !important; font-weight: normal !important; background: linear-gradient(to right, #00f2fe, #4facfe); -webkit-background-clip: text; -webkit-text-fill-color: transparent; text-align: center; margin-bottom: 0px !important; }
-    .hero-sub { font-family: 'Bitcount Prop Single', sans-serif !important; text-align: center; color: #94a3b8; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 4px; margin-bottom: 3rem; }
+    .hero-sub { font-family: 'Bitcount Prop Single', sans-serif !important; text-align: center; color: #94a3b8; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 4px; margin-bottom: 2rem; }
 
-    
-    .stTabs [data-baseweb="tab-list"] { gap: 8px; justify-content: center; flex-wrap: wrap; }
-    .stTabs [data-baseweb="tab"] { height: 50px; background: rgba(255, 255, 255, 0.05) !important; border-radius: 10px !important; border: 1px solid rgba(255,255,255,0.1) !important; padding: 0 15px !important; }
-    .stTabs [aria-selected="true"] { background: rgba(204, 255, 0, 0.1) !important; border: 1px solid var(--neon-green) !important; }
-    .stTabs [aria-selected="true"] p { color: var(--neon-green) !important; font-weight: 700 !important; }
-    
-    /* Premium Golden Button */
     div.stButton > button:has(div:contains("GENERATE AI COACHING REPORT")) {
         background: linear-gradient(135deg, #ffd700 0%, #daa520 50%, #b8860b 100%) !important;
         color: #000 !important;
         font-weight: 900 !important;
-        border: none !important;
-        box-shadow: 0 4px 15px rgba(184, 134, 11, 0.4) !important;
-        transition: all 0.3s ease !important;
-    }
-    div.stButton > button:has(div:contains("GENERATE AI COACHING REPORT")):hover {
-        transform: scale(1.02) !important;
-        box-shadow: 0 6px 20px rgba(255, 215, 0, 0.6) !important;
     }
     </style>
     """, unsafe_allow_html=True)
 
-def draw_modern_metric(label, value, delta, icon="⚡"):
-    st.markdown(f"""
-        <div class="bento-card">
-            <div style="font-size: 0.8rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px;">{label}</div>
-            <div style="font-size: 2rem; font-weight: 900; color: #ccff00; margin: 10px 0;">{icon} {value}</div>
-            <div style="font-size: 0.9rem; color: #38bdf8;">{delta} vs Average</div>
-        </div>
-    """, unsafe_allow_html=True)
-
-# --- 2. BIOMECHANIC CALCULATORS ---
-OPTIMIZED_INDICES = [0, 11, 12, 13, 14, 15, 16, 23, 24, 25, 26, 27, 28, 29, 30]
+# ============================================================================
+# 4. BIOMECHANIC CALCULATORS (Original)
+# ============================================================================
 
 def calculate_3d_angle(p1, p2, p3):
     a, b, c = np.array([p1['x'], p1['y'], p1['z']]), np.array([p2['x'], p2['y'], p2['z']]), np.array([p3['x'], p3['y'], p3['z']])
@@ -401,7 +377,6 @@ def build_pro_telemetry(raw_frames, sport_raw, action, event_frame, fps, camera_
     total_frames = len(raw_frames)
     sport_clean = "".join([c for c in sport_raw if ord(c) < 128]).strip().upper()
     event_frame = max(0, min(event_frame, total_frames - 1))
-    offset = int(event_frame - total_frames)
     
     metrics = {
         "r_elbow": [], "l_elbow": [], "r_knee": [], "l_knee": [], "r_hip": [], "l_hip": [],
@@ -411,8 +386,6 @@ def build_pro_telemetry(raw_frames, sport_raw, action, event_frame, fps, camera_
     }
     
     validation_warnings = []
-    
-    # Fix: 3-frame median filter for keypoint positions to eliminate tracking dropouts
     filtered_pos = []
     for i in range(total_frames):
         f_filt = {}
@@ -440,11 +413,8 @@ def build_pro_telemetry(raw_frames, sport_raw, action, event_frame, fps, camera_
             
         mid_s, mid_h = get_midpoint(f[11], f[12]), get_midpoint(f[23], f[24])
         current_scale = get_dist(mid_s, mid_h)
-        if current_scale < 0.05:
-            scale = last_valid_scale
-        else:
-            scale = current_scale
-            last_valid_scale = current_scale
+        scale = current_scale if current_scale >= 0.05 else last_valid_scale
+        last_valid_scale = scale
             
         metrics["r_elbow"].append(calculate_3d_angle(f[12], f[14], f[16]))
         metrics["l_elbow"].append(calculate_3d_angle(f[11], f[13], f[15]))
@@ -457,14 +427,13 @@ def build_pro_telemetry(raw_frames, sport_raw, action, event_frame, fps, camera_
         metrics["r_ankle"].append(calculate_3d_angle(f[26], f[28], f[30]))
         metrics["l_ankle"].append(calculate_3d_angle(f[25], f[27], f[29]))
         
+        speed_keys = ["r_wrist_speed", "l_wrist_speed", "r_ankle_speed", "l_ankle_speed"]
         for i, pt_idx in enumerate([16, 15, 28, 27]):
             curr_pt = filtered_pos[idx_f][pt_idx]
             if prev_pts[i]:
-                raw_disp = get_dist(curr_pt, prev_pts[i])
-                norm_speed = round(raw_disp / scale, 4)
-                metrics[list(metrics.keys())[10+i]].append(norm_speed)
+                metrics[speed_keys[i]].append(round(get_dist(curr_pt, prev_pts[i]) / scale, 4))
             else:
-                metrics[list(metrics.keys())[10+i]].append(0.0)
+                metrics[speed_keys[i]].append(0.0)
             prev_pts[i] = curr_pt
         
         metrics["shoulder_z_diff"].append(round(f[12]['z'] - f[11]['z'], 3))
@@ -472,19 +441,16 @@ def build_pro_telemetry(raw_frames, sport_raw, action, event_frame, fps, camera_
         metrics["trunk_forward_lean"].append(calculate_lean(mid_s, mid_h, 'sagittal'))
         metrics["trunk_lateral_lean"].append(calculate_lean(mid_s, mid_h, 'coronal'))
 
-    # Fix: Confirm and clamp remaining speed glitches exceeding 1.5
     for key in ["r_wrist_speed", "l_wrist_speed", "r_ankle_speed", "l_ankle_speed"]:
         if key in metrics:
             for i in range(len(metrics[key])):
                 if metrics[key][i] is not None and metrics[key][i] > 1.5:
-                    validation_warnings.append(f"Confirmed tracker glitch in {key} at frame {i}. Speed {metrics[key][i]} clamped.")
-                    prev_v = metrics[key][max(0, i-1)] or 0.0
-                    next_v = metrics[key][min(total_frames-1, i+1)] or 0.0
-                    metrics[key][i] = round((prev_v + next_v) / 2, 4)
+                    metrics[key][i] = round(((metrics[key][max(0, i-1)] or 0.0) + (metrics[key][min(total_frames-1, i+1)] or 0.0)) / 2, 4)
 
     racket_sports = ["TENNIS", "PADEL", "PICKLEBALL", "BADMINTON", "SQUASH"]
     if sport_clean in racket_sports:
-        for k in ["r_ankle", "l_ankle", "r_ankle_speed", "l_ankle_speed"]: del metrics[k]
+        for k in ["r_ankle", "l_ankle", "r_ankle_speed", "l_ankle_speed"]: 
+            if k in metrics: del metrics[k]
 
     def get_snapshot(idx):
         idx = max(0, min(idx, total_frames - 1))
@@ -492,18 +458,11 @@ def build_pro_telemetry(raw_frames, sport_raw, action, event_frame, fps, camera_
         if not f: return {}
         mid_s, mid_h = get_midpoint(f[11], f[12]), get_midpoint(f[23], f[24])
         hip_dist = get_dist(f[23], f[24])
-        
         tilt = np.degrees(np.arctan2(f[12]['y'] - f[11]['y'], f[12]['x'] - f[11]['x']))
-        if abs(tilt) > 90:
-            tilt = tilt - 180 if tilt > 0 else tilt + 180
-        
+        if abs(tilt) > 90: tilt = tilt - 180 if tilt > 0 else tilt + 180
         sw_ratio = round(get_dist(f[27], f[28]) / (hip_dist + 1e-6), 4)
-        sw_note = None
-        if sw_ratio > 2.5 or hip_dist < 0.05:
-            sw_ratio = None
-            sw_note = "keypoint_unreliable"
 
-        snap = {
+        return {
             "r_elbow_angle": calculate_3d_angle(f[12], f[14], f[16]), "l_elbow_angle": calculate_3d_angle(f[11], f[13], f[15]),
             "r_knee_angle": calculate_3d_angle(f[24], f[26], f[28]), "l_knee_angle": calculate_3d_angle(f[23], f[25], f[27]),
             "r_hip_angle": calculate_3d_angle(f[12], f[24], f[26]), "l_hip_angle": calculate_3d_angle(f[11], f[23], f[25]),
@@ -513,15 +472,13 @@ def build_pro_telemetry(raw_frames, sport_raw, action, event_frame, fps, camera_
             "shoulder_z_diff": round(f[12]['z'] - f[11]['z'], 3), "hip_z_diff": round(f[24]['z'] - f[23]['z'], 3),
             "hip_shoulder_separation": round((f[12]['z'] - f[11]['z']) - (f[24]['z'] - f[23]['z']), 3),
             "r_wrist_above_r_shoulder": f[16]['y'] < f[12]['y'], "l_wrist_above_l_shoulder": f[15]['y'] < f[11]['y'],
-            "feet_grounded": f[28]['y'] > 0.80 and f[27]['y'] > 0.80, "stance_width_ratio": sw_ratio
+            "feet_grounded": f[28]['y'] > 0.80 and f[27]['y'] > 0.80, "stance_width_ratio": sw_ratio if sw_ratio < 2.5 else None
         }
-        if sw_note: snap["stance_width_note"] = sw_note
-        return snap
 
     output = {
         "sport": sport_clean, "action": action, "camera": camera_mode,
         "metadata": {
-            "fps": fps, "total_frames": total_frames, "offset": offset,
+            "fps": fps, "total_frames": total_frames,
             "dominant_side": "right" if np.max([s for s in metrics["r_wrist_speed"] if s is not None]) > np.max([s for s in metrics["l_wrist_speed"] if s is not None]) else "left",
             "coordinate_system": {"y_axis": "increases_downward", "z_axis": "depth_into_camera", "normalisation": "mediapipe_image_fraction_0_to_1"},
             "validation_warnings": validation_warnings
@@ -529,7 +486,6 @@ def build_pro_telemetry(raw_frames, sport_raw, action, event_frame, fps, camera_
         "metrics": {k: [v for v in metrics[k] if v is not None] for k in metrics if any(v is not None for v in metrics[k])},
         "event_snapshot": get_snapshot(event_frame), "phase_snapshots": {}, "speed_analysis": {}, "rotation_analysis": {}, "balance_stability": {}
     }
-    output["event_snapshot"]["keypoints"] = [{"id": j, "x": round(raw_frames[event_frame][j]['x'], 4), "y": round(raw_frames[event_frame][j]['y'], 4), "z": round(raw_frames[event_frame][j]['z'], 4)} for j in [0,11,12,13,14,15,16,23,24,25,26,27,28,29,30] if raw_frames[event_frame]]
 
     phases = []
     if sport_clean in racket_sports: phases = [("trophy", -40), ("swing_start", -15), ("follow_through", 20)]
@@ -549,12 +505,7 @@ def build_pro_telemetry(raw_frames, sport_raw, action, event_frame, fps, camera_
     def analyze_speed(speed_series):
         clean_s = [s if s is not None else 0 for s in speed_series]
         peak_idx = np.argmax(clean_s)
-        series_around = [{"offset": o, "speed": round(clean_s[max(0, min(total_frames-1, event_frame+o))], 4)} for o in range(-45, 11) if o == 0 or abs(o) <= 3 or o % 5 == 0]
-        decel = 0
-        for i in range(event_frame-1, 0, -1):
-            if i+1 < total_frames and clean_s[i] > clean_s[i+1]: decel += 1
-            else: break
-        return {"peak_speed": round(float(np.max(clean_s)), 4), "peak_frame_offset": int(peak_idx - event_frame), "speed_at_event": round(clean_s[event_frame], 4), "frames_decelerating_before_event": decel, "speed_series_around_event": series_around}
+        return {"peak_speed": round(float(np.max(clean_s)), 4), "peak_frame_offset": int(peak_idx - event_frame), "speed_at_event": round(clean_s[event_frame], 4)}
 
     output["speed_analysis"]["r_wrist"] = analyze_speed(metrics["r_wrist_speed"])
     output["speed_analysis"]["l_wrist"] = analyze_speed(metrics["l_wrist_speed"])
@@ -564,33 +515,91 @@ def build_pro_telemetry(raw_frames, sport_raw, action, event_frame, fps, camera_
         vel = [0] + vel
         start, end = max(0, event_frame-60), min(total_frames, event_frame+6)
         window = vel[start:end]
-        if not window: return event_frame
-        return start + np.argmax(window)
+        return start + np.argmax(window) if window else event_frame
 
     shoulder_p = find_velocity_peak(metrics["shoulder_z_diff"])
     hip_p = find_velocity_peak(metrics["hip_z_diff"])
-    
-    s_z_ev = metrics["shoulder_z_diff"][event_frame]
-    h_z_ev = metrics["hip_z_diff"][event_frame]
-    
     output["rotation_analysis"] = {
         "hip_leads_shoulder": hip_p < shoulder_p, "hip_peak_offset": int(hip_p - event_frame), "shoulder_peak_offset": int(shoulder_p - event_frame),
-        "x_factor_at_event": round(s_z_ev - h_z_ev, 3),
-        "rotation_series": [{"offset": o, "hip_z": metrics["hip_z_diff"][max(0, min(total_frames-1, event_frame+o))], "shoulder_z": metrics["shoulder_z_diff"][max(0, min(total_frames-1, event_frame+o))]} for o in range(-45, 11, 5)]
+        "x_factor_at_event": round(metrics["shoulder_z_diff"][event_frame] - metrics["hip_z_diff"][event_frame], 3)
     }
-    if sport_clean in racket_sports:
-        tr_idx = max(0, min(total_frames-1, event_frame-40))
-        output["rotation_analysis"]["x_factor_at_trophy"] = round(metrics["shoulder_z_diff"][tr_idx] - metrics["hip_z_diff"][tr_idx], 3)
-
-    if sport_clean == "GOLF": output["rotation_analysis"]["x_factor_at_top"] = round(metrics["hip_z_diff"][max(0, min(total_frames-1, event_frame-30))] - metrics["shoulder_z_diff"][max(0, min(total_frames-1, event_frame-30))], 3)
-
+    
     win = [f[0]['x'] for f in raw_frames[max(0, event_frame-5):min(total_frames, event_frame+5)] if f]
-    win_y = [f[0]['y'] for f in raw_frames[max(0, event_frame-5):min(total_frames, event_frame+5)] if f]
-    output["balance_stability"] = {
-        "nose_x_variance": round(float(np.var(win)), 4) if win else 0, "nose_y_variance": round(float(np.var(win_y)), 4) if win_y else 0,
-        "head_drift_before_event": "stable", "feet_grounded_at_event": output["event_snapshot"].get("feet_grounded", False), "heel_rise_detected": False
-    }
+    output["balance_stability"] = {"nose_x_variance": round(float(np.var(win)), 4) if win else 0}
     return output
+
+# ============================================================================
+# 5. UI HELPERS (Mobile Optimized)
+# ============================================================================
+
+def draw_modern_metric(label, value, delta, icon="⚡"):
+    st.markdown(f"""
+        <div class="bento-card">
+            <div style="font-size: 0.8rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px;">{label}</div>
+            <div style="font-size: 1.8rem; font-weight: 900; color: #ccff00; margin: 10px 0;">{icon} {value}</div>
+            <div style="font-size: 0.9rem; color: #38bdf8;">{delta}</div>
+        </div>
+    """, unsafe_allow_html=True)
+
+def display_file_info(uploaded_file):
+    if uploaded_file:
+        file_size_mb = uploaded_file.size / (1024 * 1024)
+        st.caption(f"📊 {uploaded_file.name} • {file_size_mb:.1f} MB")
+
+def draw_mobile_metric_grid(metrics_dict):
+    items = list(metrics_dict.items())
+    for i in range(0, len(items), 2):
+        col1, col2 = st.columns(2)
+        with col1:
+            label, (value, delta, icon) = items[i]
+            draw_modern_metric(label, value, delta, icon)
+        if i + 1 < len(items):
+            with col2:
+                label, (value, delta, icon) = items[i + 1]
+                draw_modern_metric(label, value, delta, icon)
+
+def get_sport_metrics(sport, metrics, sl1, kpis, s):
+    # Dynamic calculations for Max Velocity
+    speed_key = "wrist_speed"
+    if any(x in sport for x in ["SOCCER", "ATHLETICS", "FOOTBALL"]):
+        speed_key = "ankle_speed"
+    max_v = max([v for v in metrics[speed_key] if v is not None] or [0])
+    v_label = "Elite" if max_v > 20 else ("Optimal" if max_v > 10 else "Developing")
+    
+    # Efficiency based on trunk lateral lean
+    lateral_lean_at_impact = metrics["trunk_lateral_lean"][sl1] if "trunk_lateral_lean" in metrics and sl1 < len(metrics["trunk_lateral_lean"]) else 0
+    efficiency = max(0, min(100, 100 - (abs(lateral_lean_at_impact) * 3)))
+    eff_label = "Elite" if efficiency > 85 else "Optimal"
+    
+    m_dict = {
+        "Max Velocity": (f"{max_v:.1f}m/s", v_label, "⚡"),
+        "Bio-Efficiency": (f"{efficiency:.0f}%", eff_label, "🧬")
+    }
+    
+    if "GYM" in sport:
+        depth = kpis.get('depth_ratio', 0)
+        m_dict["Squat Depth"] = (f"{depth:.2f}", "Elite" if depth < 0.8 else "Developing", "📏")
+    elif "GOLF" in sport:
+        xf = kpis.get('max_x_factor', 0)
+        m_dict["X-Factor"] = (f"{xf:.1f}°", "Elite" if xf > 40 else "Developing", "🔄")
+    elif "YOGA" in sport:
+        stab = kpis.get('stability', 0)*100
+        m_dict["Stability"] = (f"{stab:.1f}%", "Elite" if stab > 95 else "Optimal", "🧘")
+    elif any(x in sport for x in ["SOCCER", "BASEBALL"]):
+        linkage = kpis.get("linkage_score", 0)
+        m_dict["Kinetic Linkage"] = (f"{linkage}/100", "Elite" if linkage == 100 else "Optimal", "⛓️")
+    elif any(x in sport for x in ["MARTIAL ARTS", "BOXING"]):
+        snap = kpis.get("impact_snap", 0)
+        m_dict["Impact Snap"] = (f"{snap:.1f}", "Elite" if snap > 15 else "Optimal", "🥊")
+    else:
+        duration = s['d1']['total'] / s['d1']['fps']
+        m_dict["Movement Time"] = (f"{duration:.1f}s", "Consistent", "⏱️")
+        
+    return m_dict
+
+# ============================================================================
+# 6. ANALYTICS FUNCTIONS (Original)
+# ============================================================================
 
 def get_ai_metrics(raw_frames, fps):
     if not raw_frames: return None
@@ -611,7 +620,6 @@ def get_ai_metrics(raw_frames, fps):
         metrics["l_hip"].append(calculate_3d_angle(f[11], f[23], f[25]))
         metrics["r_hip"].append(calculate_3d_angle(f[12], f[24], f[26]))
         
-        # Speed calculations
         curr_w = np.array([f[16]['x'], f[16]['y'], f[16]['z']])
         metrics["wrist_speed"].append(round(float(np.linalg.norm(curr_w - (prev_w if prev_w is not None else curr_w))*fps),4))
         prev_w = curr_w
@@ -628,34 +636,22 @@ def get_ai_metrics(raw_frames, fps):
         metrics["ankle_speed"].append(round(float(np.linalg.norm(curr_a - (prev_a if prev_a is not None else curr_a))*fps),4))
         prev_a = curr_a
         
-        # Trunk Lean for Efficiency
         mid_s, mid_h = get_midpoint(f[11], f[12]), get_midpoint(f[23], f[24])
         metrics["trunk_lean"].append(abs(calculate_lean(mid_s, mid_h, 'sagittal')))
         metrics["trunk_lateral_lean"].append(calculate_lean(mid_s, mid_h, 'coronal'))
-        
     return metrics
 
 def generate_sport_kpis(metrics, sport, raw_frames):
     kpis = {}
     def clean(lst): return [x if x is not None else 0 for x in lst]
-    wrist_speed = clean(metrics["wrist_speed"])
-    hip_speed = clean(metrics["hip_speed"])
-    shoulder_speed = clean(metrics["shoulder_speed"])
+    wrist_speed, hip_speed, shoulder_speed = clean(metrics["wrist_speed"]), clean(metrics["hip_speed"]), clean(metrics["shoulder_speed"])
     
     RACKET_BAT = ["TENNIS 🎾", "PADEL 🎾", "PICKLEBALL 🥒", "BADMINTON 🏸", "CRICKET 🏏", "GOLF ⛳", "BASEBALL ⚾"]
     if any(s in sport for s in RACKET_BAT) or "SOCCER" in sport:
-        peak_hip = np.argmax(hip_speed)
-        peak_shoulder = np.argmax(shoulder_speed)
-        peak_wrist = np.argmax(wrist_speed)
-        kpis["sequence"] = [peak_hip, peak_shoulder, peak_wrist]
+        peak_hip, peak_shoulder, peak_wrist = np.argmax(hip_speed), np.argmax(shoulder_speed), np.argmax(wrist_speed)
         kpis["sequence_valid"] = peak_hip < peak_shoulder < peak_wrist
-        
-        # Kinetic Linkage Score (Simplified)
-        # Higher score if hip leads shoulder by 2-10 frames
         timing_diff = peak_shoulder - peak_hip
-        if 2 <= timing_diff <= 10: kpis["linkage_score"] = 100
-        elif 0 < timing_diff < 2: kpis["linkage_score"] = 70
-        else: kpis["linkage_score"] = 40
+        kpis["linkage_score"] = 100 if 2 <= timing_diff <= 10 else (70 if 0 < timing_diff < 2 else 40)
         
         if "GOLF" in sport:
             x_factors = []
@@ -669,8 +665,6 @@ def generate_sport_kpis(metrics, sport, raw_frames):
             kpis["max_x_factor"] = max(x_factors) if x_factors else 0
             
     elif "MARTIAL ARTS" in sport or "BOXING" in sport:
-        # Impact Snap: Peak deceleration speed
-        # Find peak speed and the speed 2 frames later
         peak_idx = np.argmax(wrist_speed)
         after_impact_idx = min(len(wrist_speed)-1, peak_idx + 2)
         kpis["impact_snap"] = abs(wrist_speed[peak_idx] - wrist_speed[after_impact_idx])
@@ -679,8 +673,6 @@ def generate_sport_kpis(metrics, sport, raw_frames):
         hip_y = [(f[23]['y'] + f[24]['y'])/2 for f in raw_frames if f]
         knee_y = [(f[25]['y'] + f[26]['y'])/2 for f in raw_frames if f]
         if hip_y and knee_y: kpis["depth_ratio"] = min(hip_y) / (max(knee_y) + 1e-6)
-        wrist_x = [(f[15]['x'] + f[16]['x'])/2 for f in raw_frames if f]
-        if wrist_x: kpis["bar_deviation"] = np.std(wrist_x)
     elif "YOGA" in sport:
         com_x = [(f[23]['x'] + f[24]['x'])/2 for f in raw_frames if f]
         if com_x: kpis["stability"] = 1.0 - np.std(com_x)
@@ -689,25 +681,25 @@ def generate_sport_kpis(metrics, sport, raw_frames):
 def get_actionable_insights(kpis, sport):
     insights = []
     if "sequence_valid" in kpis:
-        if kpis["sequence_valid"]: insights.append("✅ Perfect Kinetic Chain: Your energy transfer is perfectly sequenced.")
-        else: insights.append("⚠️ Power Leak: You are firing your upper body too early. Lead with the hips.")
+        insights.append("✅ Perfect Kinetic Chain" if kpis["sequence_valid"] else "⚠️ Power Leak: Lead with the hips.")
     if sport == "GOLF ⛳" and "max_x_factor" in kpis:
-        if kpis["max_x_factor"] < 30: insights.append("💡 Rotation: Increase your X-Factor separation for more drive.")
-        else: insights.append("✅ Elite Rotation: Your X-Factor is in the pro-range.")
-    if sport == "GYM 🏋️":
-        if kpis.get("depth_ratio", 0) > 0.9: insights.append("💡 Depth: Lower your hips further to break parallel.")
-        if kpis.get("bar_deviation", 0) > 0.05: insights.append("⚠️ Bar Path: Focus on keeping the weight over your mid-foot.")
-    if sport == "YOGA 🧘" and "stability" in kpis:
-        if kpis["stability"] > 0.98: insights.append("✅ Zen Stability: Your core control is exceptional.")
-        else: insights.append("💡 Core Focus: Engagement needed. Minimize lateral wobble in the pose.")
+        insights.append("✅ Elite Rotation" if kpis["max_x_factor"] > 30 else "💡 Increase X-Factor separation.")
+    if "GYM" in sport:
+        if kpis.get("depth_ratio", 0) > 0.9: insights.append("💡 Depth: Lower hips break parallel.")
+    if "YOGA" in sport and "stability" in kpis:
+        insights.append("✅ Zen Stability" if kpis["stability"] > 0.98 else "💡 Core Focus: Minimize lateral wobble.")
     if not insights: insights = ["Focus on consistent tempo.", "Keep your core engaged.", "Maintain visual focus."]
     return insights[:3]
+
+# ============================================================================
+# 7. CHARTING & RENDERING (Original)
+# ============================================================================
 
 def plot_power_curve(metrics):
     def clean(lst): return [x if x is not None else 0 for x in lst]
     fig = go.Figure()
     fig.add_trace(go.Scatter(y=clean(metrics["wrist_speed"]), fill='tozeroy', name="Wrist Velocity", line=dict(color='#ccff00')))
-    fig.update_layout(template="plotly_dark", title="Power Curve (Velocity over Time)", margin=dict(l=20, r=20, t=40, b=20), height=300)
+    fig.update_layout(template="plotly_dark", title="Power Curve", margin=dict(l=20, r=20, t=40, b=20), height=300)
     return fig
 
 def plot_radar_chart(metrics):
@@ -715,24 +707,22 @@ def plot_radar_chart(metrics):
         vals = [x for x in lst if x is not None]
         return max(vals) if vals else 0
     categories = ['L Elbow', 'R Elbow', 'L Knee', 'R Knee', 'L Hip', 'R Hip']
-    user_vals = [clean_max(metrics["l_elbow"]), clean_max(metrics["r_elbow"]), clean_max(metrics["l_knee"]), clean_max(metrics["r_knee"]), clean_max(metrics["l_hip"]), clean_max(metrics["r_hip"])]
+    user_vals = [clean_max(metrics[c.lower().replace(' ', '_')]) for c in categories]
     pro_vals = [160, 160, 140, 140, 120, 120]
     fig = go.Figure()
     fig.add_trace(go.Scatterpolar(r=user_vals, theta=categories, fill='toself', name='User'))
     fig.add_trace(go.Scatterpolar(r=pro_vals, theta=categories, fill='toself', name='Pro Benchmark', line=dict(color='#ccff00')))
-    fig.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 180])), showlegend=True, template="plotly_dark", margin=dict(l=40, r=40, t=40, b=40), height=300)
+    fig.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 180])), template="plotly_dark", margin=dict(l=40, r=40, t=40, b=40), height=300)
     return fig
 
 def plot_kinetic_chain(metrics):
     def clean(lst): return [x if x is not None else 0 for x in lst]
     fig = go.Figure()
-    fig.add_trace(go.Scatter(y=clean(metrics["hip_speed"]), name="Hip Energy", stackgroup='one', line=dict(color='#1e293b')))
-    fig.add_trace(go.Scatter(y=clean(metrics["shoulder_speed"]), name="Torso Energy", stackgroup='one', line=dict(color='#38bdf8')))
-    fig.add_trace(go.Scatter(y=clean(metrics["wrist_speed"]), name="Arm Energy", stackgroup='one', line=dict(color='#ccff00')))
-    fig.update_layout(template="plotly_dark", title="Kinetic Chain (Energy Transfer)", margin=dict(l=20, r=20, t=40, b=20), height=300)
+    fig.add_trace(go.Scatter(y=clean(metrics["hip_speed"]), name="Hip", stackgroup='one', line=dict(color='#1e293b')))
+    fig.add_trace(go.Scatter(y=clean(metrics["shoulder_speed"]), name="Torso", stackgroup='one', line=dict(color='#38bdf8')))
+    fig.add_trace(go.Scatter(y=clean(metrics["wrist_speed"]), name="Arm", stackgroup='one', line=dict(color='#ccff00')))
+    fig.update_layout(template="plotly_dark", title="Kinetic Chain", margin=dict(l=20, r=20, t=40, b=20), height=300)
     return fig
-
-FULL_SKELETON = [(0,1), (1,2), (2,3), (3,7), (0,4), (4,5), (5,6), (6,8), (9,10), (11,12), (11,13), (13,15), (12,14), (14,16), (11,23), (12,24), (23,24), (23,25), (25,27), (24,26), (26,28)]
 
 def download_model():
     p = 'pose_landmarker_heavy.task'
@@ -759,9 +749,10 @@ def analyze_vid(path, model):
             prev_w = w
     cap.release(); return {"history": history, "raw": raw, "fps": fps, "total": len(history), "impact": impact_f}
 
-def draw_neon_skeleton(img, lms, alpha=0.5):
+def draw_neon_skeleton(img, lms, alpha=0.15):
     if not lms: return
     overlay = img.copy()
+    FULL_SKELETON = [(0,1), (1,2), (2,3), (3,7), (0,4), (4,5), (5,6), (6,8), (9,10), (11,12), (11,13), (13,15), (12,14), (14,16), (11,23), (12,24), (23,24), (23,25), (25,27), (24,26), (26,28)]
     for s, e in FULL_SKELETON:
         p1 = (int(lms[s].x*img.shape[1]), int(lms[s].y*img.shape[0]))
         p2 = (int(lms[e].x*img.shape[1]), int(lms[e].y*img.shape[0]))
@@ -802,259 +793,178 @@ def render_pro_stereo(p1, p2, h1, h2, f1, f2, fps):
     subprocess.run(f'ffmpeg -y -i "{raw_p}" -c:v libx264 -pix_fmt yuv420p -preset ultrafast "{final_p}"', shell=True)
     return final_p
 
-# --- UI ---
-st.markdown("<h1>Vector Victor AI</h1>", unsafe_allow_html=True)
-st.markdown("<p class='hero-sub'>Deep form Vector based Bio mechanics AI engine</p>", unsafe_allow_html=True)
+# ============================================================================
+# 8. SPORT CONFIG & MAIN APP (Merged logic)
+# ============================================================================
 
 SPORT_CONFIG = {
-    "TENNIS 🎾": [
-        "First Serve", "Second Serve", "Kick Serve", "Slice Serve", 
-        "Forehand Flat", "Forehand Topspin", "Forehand Slice", 
-        "Backhand One-Handed", "Backhand Two-Handed", "Backhand Slice", 
-        "Forehand Volley", "Backhand Volley", "Overhead Smash", 
-        "Drop Shot", "Lob", "Return of Serve"
-    ],
-    "PADEL 🎾": [
-        "Serve", "Forehand Groundstroke", "Backhand Groundstroke",
-        "Bandeja", "Vibora", "Flat Smash", "Smash 'por 3'", "Smash 'por 4'",
-        "Forehand Volley", "Backhand Volley", "Bajada de Pared", 
-        "Chiquita", "Globo (Lob)", "Contrapared"
-    ],
-    "PICKLEBALL 🥒": [
-        "Serve (Volley)", "Serve (Drop)", "Dink (Straight)", "Dink (Cross-court)",
-        "Third Shot Drop", "Third Shot Drive", "Speed Up",
-        "Kitchen Volley", "Punch Volley", "Overhead Slam",
-        "Reset Shot", "Backhand Flick", "Lob"
-    ],
-    "GOLF ⛳": [
-        "Driver Tee Shot", "Fairway Wood", "Long Iron", "Short Iron",
-        "Pitch Shot", "Chipping", "Sand Bunker Shot", "Putter Stroke",
-        "Full Backswing", "Downswing Transition", "Follow Through"
-    ],
-    "BADMINTON 🏸": [
-        "High Serve", "Low Serve", "Flick Serve",
-        "Forehand Smash", "Backhand Smash", "Jump Smash",
-        "Clear (Lob)", "Drop Shot", "Net Kill", "Net Lift",
-        "Drive Shot", "Around-the-head Shot"
-    ],
-    "CRICKET 🏏": [
-        "Forward Defense", "Cover Drive", "Pull Shot", "Hook Shot",
-        "Cut Shot", "Sweep Shot", "Fast Bowling Action", "Spin Bowling Action",
-        "Wicket-keeping Stance", "Power Hitting (Slog)", "High Catching"
-    ],
-    "SOCCER ⚽": [
-        "Instep Drive (Power)", "Side-foot Pass", "Curled Shot", 
-        "Long Ball/Switch", "Heading (Standing)", "Heading (Jumping)",
-        "Goalkeeper Dive", "Goalkeeper Goal Kick", "Throw-in",
-        "Penalty Kick", "Volley", "First Touch Control"
-    ],
-    "BASKETBALL 🏀": [
-        "Jump Shot", "Three-Pointer", "Free Throw", 
-        "Layup (Right/Left)", "Driving Dunk", "Chest Pass", 
-        "Bounce Pass", "Overhead Pass", "Defensive Slide",
-        "Post-up Turnaround", "Rebounding Box-out"
-    ],
+    "TENNIS 🎾": ["First Serve", "Second Serve", "Forehand Flat", "Forehand Topspin", "Forehand Slice", "Backhand One-Handed", "Backhand Two-Handed", "Backhand Slice", "Forehand Volley", "Backhand Volley", "Overhead Smash", "Drop Shot", "Lob", "Return of Serve"],
+    "PADEL 🎾": ["Serve", "Forehand Groundstroke", "Backhand Groundstroke", "Bandeja", "Vibora", "Flat Smash", "Smash 'por 3'", "Smash 'por 4'", "Forehand Volley", "Backhand Volley", "Bajada de Pared", "Chiquita", "Globo (Lob)", "Contrapared"],
+    "PICKLEBALL 🥒": ["Serve (Volley)", "Serve (Drop)", "Dink (Straight)", "Dink (Cross-court)", "Third Shot Drop", "Third Shot Drive", "Speed Up", "Kitchen Volley", "Punch Volley", "Overhead Slam", "Reset Shot", "Backhand Flick", "Lob"],
+    "GOLF ⛳": ["Driver Tee Shot", "Fairway Wood", "Long Iron", "Short Iron", "Pitch Shot", "Chipping", "Sand Bunker Shot", "Putter Stroke", "Full Backswing", "Downswing Transition", "Follow Through"],
+    "BADMINTON 🏸": ["High Serve", "Low Serve", "Flick Serve", "Forehand Smash", "Backhand Smash", "Jump Smash", "Clear (Lob)", "Drop Shot", "Net Kill", "Net Lift", "Drive Shot", "Around-the-head Shot"],
+    "CRICKET 🏏": ["Forward Defense", "Cover Drive", "Pull Shot", "Hook Shot", "Cut Shot", "Sweep Shot", "Fast Bowling Action", "Spin Bowling Action", "Wicket-keeping Stance", "Power Hitting (Slog)", "High Catching"],
+    "SOCCER ⚽": ["Instep Drive (Power)", "Side-foot Pass", "Curled Shot", "Long Ball/Switch", "Heading (Standing)", "Heading (Jumping)", "Goalkeeper Dive", "Goalkeeper Goal Kick", "Throw-in", "Penalty Kick", "Volley", "First Touch Control"],
+    "BASKETBALL 🏀": ["Jump Shot", "Three-Pointer", "Free Throw", "Layup (Right/Left)", "Driving Dunk", "Chest Pass", "Bounce Pass", "Overhead Pass", "Defensive Slide", "Post-up Turnaround", "Rebounding Box-out"],
     "BASEBALL ⚾": ["Pitching (Wind-up)", "Pitching (Stretch)", "Power Swing", "Bunt", "Catcher Throw-down", "Infield Scoop", "Sliding"],
     "AMERICAN FOOTBALL 🏈": ["QB Drop-back Pass", "QB Shotgun Pass", "Field Goal Kick", "Punting", "WR Route Cut", "Lineman Drive Block"],
     "ICE HOCKEY 🏒": ["Slap Shot", "Wrist Shot", "Snap Shot", "Backhand Shot", "Skating Stride (Start)", "Skating Crossover"],
     "TABLE TENNIS 🏓": ["Forehand Loop", "Backhand Push", "Pendulum Serve", "Forehand Smash", "Backhand Flick", "Chop"],
     "MARTIAL ARTS 🥋": ["Jab-Cross Combo", "Roundhouse Kick", "Front Kick", "Lead Hook", "Double Leg Takedown", "Sprawl", "Block/Parry"],
-    "BOXING/MMA 🥊": [
-        "Jab", "Cross", "Lead Hook", "Rear Hook", 
-        "Uppercut", "Lead Roundhouse Kick", "Rear Roundhouse Kick",
-        "Front Kick (Teep)", "Shoulder Roll", "Slip/Bob and Weave",
-        "Double Leg Takedown", "Sprawl"
-    ],
-    "GYM 🏋️": [
-        "Back Squat", "Front Squat", "Deadlift (Conventional)", "Deadlift (Sumo)",
-        "Bench Press", "Overhead Press", "Barbell Row", "Pull-up",
-        "Clean and Jerk", "Snatch", "Kettlebell Swing", "Lunge"
-    ],
-    "YOGA 🧘": [
-        "Downward Dog", "Warrior I", "Warrior II", "Warrior III",
-        "Tree Pose", "Triangle Pose", "Crow Pose", "Plank/Chaturanga",
-        "Cobra/Upward Dog", "Half Moon Pose", "Bridge Pose", "Wheel Pose"
-    ],
-    "ATHLETICS/RUNNING 🏃": [
-        "Sprint Start (Blocks)", "Max Velocity Phase", "Distance Running Gate",
-        "Long Jump Takeoff", "High Jump Fosbury Flop", "Hurdle Clearance",
-        "Shot Put Glide", "Shot Put Rotational", "Javelin Throw"
-    ]
+    "BOXING/MMA 🥊": ["Jab", "Cross", "Lead Hook", "Rear Hook", "Uppercut", "Lead Roundhouse Kick", "Rear Roundhouse Kick", "Front Kick (Teep)", "Shoulder Roll", "Slip/Bob and Weave", "Double Leg Takedown", "Sprawl"],
+    "GYM 🏋️": ["Back Squat", "Front Squat", "Deadlift (Conventional)", "Deadlift (Sumo)", "Bench Press", "Overhead Press", "Barbell Row", "Pull-up", "Clean and Jerk", "Snatch", "Kettlebell Swing", "Lunge"],
+    "YOGA 🧘": ["Downward Dog", "Warrior I", "Warrior II", "Warrior III", "Tree Pose", "Triangle Pose", "Crow Pose", "Plank/Chaturanga", "Cobra/Upward Dog", "Half Moon Pose", "Bridge Pose", "Wheel Pose"],
+    "ATHLETICS/RUNNING 🏃": ["Sprint Start (Blocks)", "Max Velocity Phase", "Distance Running Gate", "Long Jump Takeoff", "High Jump Fosbury Flop", "Hurdle Clearance", "Shot Put Glide", "Shot Put Rotational", "Javelin Throw"]
 }
 
-# --- DYNAMIC TAB GENERATION ---
-sport_names = list(SPORT_CONFIG.keys())
-tabs = st.tabs(sport_names)
+# App Header
+st.markdown("<h1>Vector Victor AI</h1>", unsafe_allow_html=True)
+st.markdown("<p class='hero-sub'>Deep form Vector based Bio mechanics AI engine</p>", unsafe_allow_html=True)
 
-for i, tab in enumerate(tabs):
-    sport = sport_names[i]
-    with tab:
-        st.markdown(f"""
-            <div class="glass-card">
-                <div style="color: #ccff00; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px;">🚀 {sport} Quick Start Guide</div>
-                <div style="font-size: 0.9rem; color: #94a3b8; display: flex; gap: 20px; flex-wrap: wrap;">
-                    <span><b>1.</b> Select specific action</span>
-                    <span><b>2.</b> Upload Source(s)</span>
-                    <span><b>3.</b> Sync Impact Frame</span>
-                    <span><b>4.</b> Generate Analysis</span>
-                </div>
-            </div>
-        """, unsafe_allow_html=True)
+# Tabs Navigation
+tab1, tab2, tab3 = st.tabs(["📹 Upload", "🔧 Analyze", "📊 Results"])
+
+# Tab 1: Upload
+with tab1:
+    st.subheader("Upload Videos")
+    selected_sport = st.selectbox("Select Sport", list(SPORT_CONFIG.keys()), key="sport_sel")
+    selected_action = st.selectbox("Select Action", SPORT_CONFIG[selected_sport], key="action_sel")
+    
+    st.markdown("### 📹 Primary View (Required)")
+    u1 = st.file_uploader("Upload main angle", type=["mp4","mov"], key="u1_upload", label_visibility="collapsed")
+    if u1: display_file_info(u1)
+    
+    is_stereo = st.toggle("Stereographic Mode (Dual View)", value=False, key="st_toggle")
+    u2 = None
+    if is_stereo:
+        st.markdown("### 📹 Secondary View (Optional)")
+        u2 = st.file_uploader("Upload second angle", type=["mp4","mov"], key="u2_upload", label_visibility="collapsed")
+        if u2: display_file_info(u2)
+
+    if u1:
+        if st.button("PROCEED TO ANALYSIS", type="primary", use_container_width=True):
+            st.session_state["u1"] = u1
+            st.session_state["u2"] = u2
+            st.session_state["sport"] = selected_sport
+            st.session_state["action"] = selected_action
+            
+            model_task = download_model()
+            t1_p = os.path.join(tempfile.gettempdir(), f"l_raw.mp4")
+            with open(t1_p, "wb") as f: f.write(u1.getbuffer())
+            
+            with st.status(f"Analyzing {selected_sport}...") as status:
+                d1 = analyze_vid(t1_p, model_task)
+                d2, t2_p = None, None
+                if is_stereo and u2:
+                    t2_p = os.path.join(tempfile.gettempdir(), f"s_raw.mp4")
+                    with open(t2_p, "wb") as f: f.write(u2.getbuffer())
+                    d2 = analyze_vid(t2_p, model_task)
+                
+                st.session_state["data_current"] = {"d1": d1, "d2": d2, "p1": t1_p, "p2": t2_p}
+                status.update(label="Initial analysis complete!", state="complete")
+            st.rerun()
+    else:
+        st.info("📌 Upload a video to start.")
+
+# Tab 2: Analyze
+with tab2:
+    if "data_current" not in st.session_state:
+        st.warning("⚠️ Upload and process a video first.")
+    else:
+        s = st.session_state["data_current"]
+        sport, action = st.session_state["sport"], st.session_state["action"]
+        st.subheader(f"Synchronize: {sport}")
         
-        col_ui, col_viz = st.columns([1, 2])
-        res_key = f"data_{sport}"
+        st.markdown("### 🎬 Source 1 Sync")
+        sl1 = st.slider("Align on Impact Frame", 0, s['d1']['total']-1, s['d1']['impact'], key="sl1_sync", label_visibility="collapsed")
+        st.caption(f"Impact Frame: {sl1}")
         
-        with col_ui:
-            st.markdown(f"### {sport} Settings")
-            action = st.selectbox("Select Specific Action", SPORT_CONFIG[sport], key=f"act_sel_{sport}")
-            is_stereo = st.toggle("Stereographic Mode (Dual View)", value=False, key=f"st_{sport}")
-            u1 = st.file_uploader("Source 1 (Lead/Side View)", type=["mp4","mov"], key=f"u1_{sport}")
-            u2 = st.file_uploader("Source 2 (Back/Alternative View)", type=["mp4","mov"], key=f"u2_{sport}") if is_stereo else None
+        sl2 = 0
+        if s['p2']:
+            st.markdown("### 🎬 Source 2 Sync")
+            sl2 = st.slider("Align secondary view", 0, s['d2']['total']-1, s['d2']['impact'], key="sl2_sync", label_visibility="collapsed")
+            st.caption(f"Secondary Sync: {sl2}")
+            
+        # Preview
+        cap1 = cv2.VideoCapture(s['p1']); cap1.set(cv2.CAP_PROP_POS_FRAMES, sl1)
+        ret1, i1 = cap1.read(); cap1.release()
+        if ret1 and i1 is not None:
+            i1 = cv2.cvtColor(i1, cv2.COLOR_BGR2RGB)
+            if s['p2']:
+                cap2 = cv2.VideoCapture(s['p2']); cap2.set(cv2.CAP_PROP_POS_FRAMES, sl2)
+                ret2, i2 = cap2.read(); cap2.release()
+                if ret2 and i2 is not None:
+                    i2 = cv2.cvtColor(i2, cv2.COLOR_BGR2RGB)
+                    h_t = 400
+                    w1_n, w2_n = int(i1.shape[1] * (h_t / i1.shape[0])), int(i2.shape[1] * (h_t / i2.shape[0]))
+                    st.image(np.hstack((cv2.resize(i1, (w1_n, h_t)), cv2.resize(i2, (w2_n, h_t)))), use_container_width=True)
+            else:
+                st.image(i1, use_container_width=True)
 
-            if st.button("RUN PRO ANALYSIS", key=f"run_{sport}", use_container_width=True):
-                if u1 is not None:
-                    model_task = download_model()
-                    t1_p = os.path.join(tempfile.gettempdir(), f"l_{sport}.mp4")
-                    with open(t1_p, "wb") as f: f.write(u1.getbuffer())
-                    with st.status(f"Analyzing {sport}...") as status:
-                        d1 = analyze_vid(t1_p, model_task)
-                        d2, t2_p = None, None
-                        if is_stereo and u2:
-                            t2_p = os.path.join(tempfile.gettempdir(), f"s_{sport}.mp4")
-                            with open(t2_p, "wb") as f: f.write(u2.getbuffer())
-                            d2 = analyze_vid(t2_p, model_task)
-                        st.session_state[res_key] = {"d1": d1, "d2": d2, "p1": t1_p, "p2": t2_p}
-                else:
-                    st.error("Please upload at least one video file.")
+        if st.button("🚀 START FINAL BIOMECHANICAL RENDER", type="primary", use_container_width=True):
+            with st.spinner("Processing Vectors..."):
+                final_v = render_pro_stereo(s['p1'], s['p2'], s['d1']['history'], (s['d2']['history'] if s['d2'] else []), sl1, sl2, s['d1']['fps'])
+                st.session_state["final_video"] = final_v
+                raw_interp = interpolate_landmarks(s['d1']['raw'])
+                tele_opt = build_pro_telemetry(raw_interp, sport, action, sl1, s['d1']['fps'], "dual" if s['p2'] else "lead")
+                st.session_state["brief"] = generate_brief(tele_opt)
+                st.session_state["sl1_val"] = sl1 # For efficiency calc
+            st.rerun()
 
-        with col_viz:
-            if res_key in st.session_state:
-                s = st.session_state[res_key]
-                final_started_key = f"started_{sport}"
-                if final_started_key not in st.session_state:
-                    sl1 = st.slider("Source 1 Sync", 0, s['d1']['total']-1, s['d1']['impact'], key=f"sl1_{sport}")
-                    sl2 = st.slider("Source 2 Sync", 0, (s['d2']['total']-1 if s['d2'] else 0), (s['d2']['impact'] if s['d2'] else 0), key=f"sl2_{sport}") if s['p2'] else 0
-                    
-                    if st.button("🚀 START FINAL BIOMECHANICAL RENDER", key=f"gen_{sport}", use_container_width=True):
-                        st.session_state[final_started_key] = True
-                        with st.spinner("Processing Vectors..."):
-                            final_v = render_pro_stereo(s['p1'], s['p2'], s['d1']['history'], (s['d2']['history'] if s['d2'] else []), sl1, sl2, s['d1']['fps'])
-                            st.session_state[f"video_{sport}"] = final_v
-                            raw_interp = interpolate_landmarks(s['d1']['raw'])
-                            tele_opt = build_pro_telemetry(raw_interp, sport, action, sl1, s['d1']['fps'], "dual" if s['p2'] else "lead")
-                            st.session_state[f"brief_{sport}"] = generate_brief(tele_opt)
-                        st.rerun()
+# Tab 3: Results
+with tab3:
+    if "final_video" not in st.session_state:
+        st.warning("⚠️ Complete the synchronization and render first.")
+    else:
+        s = st.session_state["data_current"]
+        sport, action = st.session_state["sport"], st.session_state["action"]
+        st.subheader("Performance Analysis")
+        st.video(st.session_state["final_video"])
+        
+        st.markdown("### 📊 PRO ANALYTICS DASHBOARD")
+        metrics = get_ai_metrics(s['d1']['raw'], s['d1']['fps'])
+        if metrics:
+            kpis = generate_sport_kpis(metrics, sport, s['d1']['raw'])
+            insights = get_actionable_insights(kpis, sport)
+            m_grid = get_sport_metrics(sport, metrics, st.session_state["sl1_val"], kpis, s)
+            draw_mobile_metric_grid(m_grid)
+            
+            st.markdown("---")
+            st.markdown("### 💡 AI Coaching Insights")
+            for insight in insights: st.success(insight)
+            
+            st.markdown("---")
+            st.markdown("### 📊 Detailed Analytics")
+            chart_view = st.radio("Choose view", ["Power Curve", "Radar Chart", "Kinetic Chain"], horizontal=True, label_visibility="collapsed")
+            if chart_view == "Power Curve": st.plotly_chart(plot_power_curve(metrics), use_container_width=True)
+            elif chart_view == "Radar Chart": st.plotly_chart(plot_radar_chart(metrics), use_container_width=True)
+            else: st.plotly_chart(plot_kinetic_chain(metrics), use_container_width=True)
+            
+            st.markdown("---")
+            if st.button("🤖 GENERATE AI COACHING REPORT", type="primary", use_container_width=True):
+                with st.status("AI is analyzing...") as status:
+                    report_text = generate_pro_report(st.session_state["brief"])
+                    st.session_state["report_text"] = report_text
+                    status.update(label="Report Complete!", state="complete")
+            
+            if "report_text" in st.session_state:
+                st.markdown(st.session_state["report_text"])
+                
+                st.markdown("### 📥 Export & Share")
+                c1, c2 = st.columns(2)
+                with c1:
+                    docx_f = create_docx_report(st.session_state["report_text"], sport)
+                    st.download_button("📄 Word Doc", docx_f, f"{sport}_Analysis.docx", use_container_width=True)
+                with c2:
+                    pdf_f = create_pdf_report(st.session_state["report_text"], sport)
+                    st.download_button("📜 PDF Report", pdf_f, f"{sport}_Analysis.pdf", use_container_width=True)
+                
+                z_buf = io.BytesIO()
+                with zipfile.ZipFile(z_buf, "w") as zf:
+                    zf.write(st.session_state["final_video"], "analysis.mp4")
+                    zf.writestr("AI_BRIEF.txt", st.session_state["brief"])
+                st.download_button("📥 Download ZIP (Video + Data)", z_buf.getvalue(), f"{sport}_Data.zip", use_container_width=True)
 
-                if final_started_key in st.session_state:
-                    st.video(st.session_state[f"video_{sport}"])
-                    if st.button("🤖 GENERATE AI COACHING REPORT", key=f"ai_{sport}", use_container_width=True):
-                        report_text = generate_pro_report(st.session_state[f"brief_{sport}"])
-                        st.markdown(report_text)
-
-                st.markdown("### 📊 PRO ANALYTICS DASHBOARD")
-                metrics = get_ai_metrics(s['d1']['raw'], s['d1']['fps'])
-                if metrics:
-                    kpis = generate_sport_kpis(metrics, sport, s['d1']['raw'])
-                    insights = get_actionable_insights(kpis, sport)
-                    m1, m2, m3 = st.columns(3)
-                    with m1: draw_modern_metric("Max Velocity", f"{max([v for v in metrics['wrist_speed'] if v is not None] or [0]):.1f}m/s", "+12%", "⚡")
-                    with m2:
-                        if "GYM" in sport: draw_modern_metric("Squat Depth", f"{kpis.get('depth_ratio', 0):.2f}", "-5%", "📏")
-                        elif "GOLF" in sport: draw_modern_metric("X-Factor", f"{kpis.get('max_x_factor', 0):.1f}°", "+8%", "🔄")
-                        else: draw_modern_metric("Avg Tempo", "2.1s", "+0.2s", "⏱️")
-                    with m3: draw_modern_metric("Consistency", "94%", "+2%", "🎯")
-                    for insight in insights: st.success(insight)
-                    st.plotly_chart(plot_power_curve(metrics), use_container_width=True)
-
-
-                # Results Section
-                if final_started_key in st.session_state:
-                    st.video(st.session_state[f"video_{sport}"])
-                    
-                    z_buf = io.BytesIO()
-                    with zipfile.ZipFile(z_buf, "w") as zf:
-                        zf.write(st.session_state[f"video_{sport}"], "analysis.mp4")
-                        if f"brief_{sport}" in st.session_state:
-                            zf.writestr("SHARE_FILE_WITH_AI.txt", st.session_state[f"brief_{sport}"])
-                        else:
-                            zf.writestr("SHARE_FILE_WITH_AI.txt", "Brief not yet generated.")
-                    
-                    st.download_button("📥 DOWNLOAD VIDEO & AI BRIEF", z_buf.getvalue(), f"{sport}_Report.zip", use_container_width=True)
-
-                    if f"brief_{sport}" in st.session_state:
-                        st.markdown("---")
-                        if st.button("🤖 GENERATE AI COACHING REPORT", key=f"ai_{sport}", use_container_width=True):
-                            coaching_brief = st.session_state[f"brief_{sport}"]
-                            with st.status("Vector Victor AI is analyzing your biomechanics...") as status:
-                                report_text = generate_pro_report(coaching_brief)
-                                if "⚠️" in report_text:
-                                    status.update(label="Analysis Failed", state="error", expanded=True)
-                                    st.error(report_text)
-                                else:
-                                    status.update(label="Analysis Complete!", state="complete", expanded=True)
-                                    st.markdown("---")
-                                    st.markdown(report_text)
-                                    docx_file = create_docx_report(report_text, sport)
-                                    st.download_button("📄 DOWNLOAD RICH REPORT (WORD)", docx_file, f"{sport}_Pro_Analysis.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", use_container_width=True)
-
-                                    # Pro PDF Download
-                                    try:
-                                        pdf_file = create_pdf_report(report_text, sport)
-                                        st.download_button("📜 DOWNLOAD PROFESSIONAL PDF REPORT", pdf_file, f"{sport}_Pro_Analysis.pdf", "application/pdf", use_container_width=True)
-                                    except Exception as pdf_err:
-                                        st.error(f"❌ PDF Rendering Issue: {str(pdf_err)}")
-
-                st.markdown("### 📊 PRO ANALYTICS DASHBOARD")
-                metrics = get_ai_metrics(s['d1']['raw'], s['d1']['fps'])
-                if metrics:
-                    kpis = generate_sport_kpis(metrics, sport, s['d1']['raw'])
-                    insights = get_actionable_insights(kpis, sport)
-                    
-                    # Dynamic calculations
-                    speed_key = "wrist_speed"
-                    if any(s in sport for s in ["SOCCER", "ATHLETICS", "FOOTBALL"]):
-                        speed_key = "ankle_speed"
-                    max_v = max([v for v in metrics[speed_key] if v is not None] or [0])
-                    v_label = "Elite" if max_v > 20 else ("Optimal" if max_v > 10 else "Developing")
-                    
-                    # Dashboard Calculation Refactor
-                    lateral_lean_at_impact = metrics["trunk_lateral_lean"][sl1] if "trunk_lateral_lean" in metrics and sl1 < len(metrics["trunk_lateral_lean"]) else 0
-                    efficiency = max(0, min(100, 100 - (abs(lateral_lean_at_impact) * 3)))
-                    eff_label = "Elite" if efficiency > 85 else "Optimal"
-                    
-                    m1, m2, m3 = st.columns(3)
-                    with m1: draw_modern_metric("Max Velocity", f"{max_v:.1f}m/s", v_label, "⚡")
-                    with m2:
-                        if "GYM" in sport: 
-                            depth = kpis.get('depth_ratio', 0)
-                            d_label = "Elite" if depth < 0.8 else "Developing"
-                            draw_modern_metric("Squat Depth", f"{depth:.2f}", d_label, "📏")
-                        elif "GOLF" in sport: 
-                            xf = kpis.get('max_x_factor', 0)
-                            xf_label = "Elite" if xf > 40 else "Developing"
-                            draw_modern_metric("X-Factor", f"{xf:.1f}°", xf_label, "🔄")
-                        elif "YOGA" in sport: 
-                            stab = kpis.get('stability', 0)*100
-                            s_label = "Elite" if stab > 95 else "Optimal"
-                            draw_modern_metric("Stability", f"{stab:.1f}%", s_label, "🧘")
-                        elif any(s in sport for s in ["SOCCER", "BASEBALL"]):
-                            linkage = kpis.get("linkage_score", 0)
-                            l_label = "Elite" if linkage == 100 else "Optimal"
-                            draw_modern_metric("Kinetic Linkage", f"{linkage}/100", l_label, "⛓️")
-                        elif any(s in sport for s in ["MARTIAL ARTS", "BOXING"]):
-                            snap = kpis.get("impact_snap", 0)
-                            sn_label = "Elite" if snap > 15 else "Optimal"
-                            draw_modern_metric("Impact Snap", f"{snap:.1f}", sn_label, "🥊")
-                        else: 
-                            duration = s['d1']['total'] / s['d1']['fps']
-                            draw_modern_metric("Movement Duration", f"{duration:.1f}s", "Consistent", "⏱️")
-                    with m3: draw_modern_metric("Bio-Efficiency", f"{efficiency:.0f}%", eff_label, "🧬")
-                    
-                    st.markdown("<div style='margin-top: 20px;'>", unsafe_allow_html=True)
-                    for insight in insights: st.success(insight)
-                    st.markdown("</div>", unsafe_allow_html=True)
-                    ch1, ch2 = st.columns(2)
-                    with ch1: st.plotly_chart(plot_power_curve(metrics), use_container_width=True)
-                    with ch2: st.plotly_chart(plot_radar_chart(metrics), use_container_width=True)
-                    RACKET_BAT = ["TENNIS 🎾", "PADEL 🎾", "PICKLEBALL 🥒", "BADMINTON 🏸", "CRICKET 🏏", "GOLF ⛳"]
-                    if sport in RACKET_BAT: st.plotly_chart(plot_kinetic_chain(metrics), use_container_width=True)
+        if st.button("↺ Analyze Another Video", use_container_width=True):
+            for key in list(st.session_state.keys()): del st.session_state[key]
+            st.rerun()
