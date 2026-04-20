@@ -538,9 +538,14 @@ def build_pro_telemetry(raw_frames, sport_raw, action, event_frame, fps, camera_
     elif sport_clean == "GOLF": phases = [("address", -80), ("top", -30), ("downswing", -12), ("follow", 25)]
     elif sport_clean == "GYM": phases = [("start", -45), ("midpoint", -22), ("finish", 30)]
     elif sport_clean == "YOGA": phases = [("approach", -30), ("exit", 30)]
-    elif sport_clean == "FOOTBALL/SOCCER": phases = [("approach", -15), ("strike", 0), ("follow_through", 10)]
+    elif sport_clean == "SOCCER": phases = [("approach", -15), ("strike", 0), ("follow_through", 10)]
     elif sport_clean == "BOXING/MMA": phases = [("load", -10), ("impact", 0), ("recoil", 8)]
     elif sport_clean == "ATHLETICS/RUNNING": phases = [("drive", -5), ("extension", 0), ("recovery", 12)]
+    elif sport_clean == "BASEBALL": phases = [("Leg Lift", -40), ("Stride Foot Plant", -15), ("Release/Impact", 0), ("Follow Through", +20)]
+    elif sport_clean == "AMERICAN FOOTBALL": phases = [("Set/Drop", -20), ("Release/Kick", 0), ("Follow Through", +15)]
+    elif sport_clean == "ICE HOCKEY": phases = [("Backswing", -12), ("Puck Impact", 0), ("Follow Through", +10)]
+    elif sport_clean == "TABLE TENNIS": phases = [("Backswing", -8), ("Impact", 0), ("Recovery", +5)]
+    elif sport_clean == "MARTIAL ARTS": phases = [("Chamber/Load", -10), ("Impact", 0), ("Reset", +8)]
     for name, p_off in phases: output["phase_snapshots"][name] = get_snapshot(event_frame + p_off)
 
     def analyze_speed(speed_series):
@@ -804,7 +809,7 @@ SPORT_CONFIG = {
         "Cut Shot", "Sweep Shot", "Fast Bowling Action", "Spin Bowling Action",
         "Wicket-keeping Stance", "Power Hitting (Slog)", "High Catching"
     ],
-    "FOOTBALL/SOCCER ⚽": [
+    "SOCCER ⚽": [
         "Instep Drive (Power)", "Side-foot Pass", "Curled Shot", 
         "Long Ball/Switch", "Heading (Standing)", "Heading (Jumping)",
         "Goalkeeper Dive", "Goalkeeper Goal Kick", "Throw-in",
@@ -816,6 +821,11 @@ SPORT_CONFIG = {
         "Bounce Pass", "Overhead Pass", "Defensive Slide",
         "Post-up Turnaround", "Rebounding Box-out"
     ],
+    "BASEBALL ⚾": ["Pitching (Wind-up)", "Pitching (Stretch)", "Power Swing", "Bunt", "Catcher Throw-down", "Infield Scoop", "Sliding"],
+    "AMERICAN FOOTBALL 🏈": ["QB Drop-back Pass", "QB Shotgun Pass", "Field Goal Kick", "Punting", "WR Route Cut", "Lineman Drive Block"],
+    "ICE HOCKEY 🏒": ["Slap Shot", "Wrist Shot", "Snap Shot", "Backhand Shot", "Skating Stride (Start)", "Skating Crossover"],
+    "TABLE TENNIS 🏓": ["Forehand Loop", "Backhand Push", "Pendulum Serve", "Forehand Smash", "Backhand Flick", "Chop"],
+    "MARTIAL ARTS 🥋": ["Jab-Cross Combo", "Roundhouse Kick", "Front Kick", "Lead Hook", "Double Leg Takedown", "Sprawl", "Block/Parry"],
     "BOXING/MMA 🥊": [
         "Jab", "Cross", "Lead Hook", "Rear Hook", 
         "Uppercut", "Lead Roundhouse Kick", "Rear Roundhouse Kick",
