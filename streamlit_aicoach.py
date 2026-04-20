@@ -273,12 +273,9 @@ st.markdown("""
         text-transform: uppercase !important;
     }
 
-    /* Specifically fix the Upload Button text overlap */
-    [data-testid="stFileUploader"] section button div {
-        text-transform: none !important;
-    }
-    
-    [data-testid="stFileUploader"] label {
+    /* Revert File Uploader to Defaults to fix overlap */
+    [data-testid="stFileUploader"], [data-testid="stFileUploader"] * {
+        font-family: sans-serif !important;
         text-transform: none !important;
     }
     
