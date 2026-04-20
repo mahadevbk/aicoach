@@ -713,7 +713,8 @@ def build_pro_telemetry(raw_frames, sport_raw, action, event_frame, fps, camera_
             "validation_warnings": validation_warnings
         },
         "metrics": {k: [v for v in metrics[k] if v is not None] for k in metrics if any(v is not None for v in metrics[k])},
-        "event_snapshot": get_snapshot(event_frame), "phase_snapshots": {}, "speed_analysis": {}, "rotation_analysis": {}, "balance_stability": {}
+        "event_snapshot": get_snapshot(event_frame), "phase_snapshots": {}, "speed_analysis": {}, "rotation_analysis": {}, "balance_stability": {},
+        "bilateral_analysis": {}, "rom_analysis": {}, "motion_profiles": {}, "smoothness_analysis": {}
     }
 
     phases = []
@@ -736,8 +737,30 @@ def build_pro_telemetry(raw_frames, sport_raw, action, event_frame, fps, camera_
         peak_idx = np.argmax(clean_s)
         return {"peak_speed": round(float(np.max(clean_s)), 4), "peak_frame_offset": int(peak_idx - event_frame), "speed_at_event": round(clean_s[event_frame], 4)}
 
-    output["speed_analysis"]["r_wrist"] = analyze_speed(metrics["r_wrist_speed"])
-    output["speed_analysis"]["l_wrist"] = analyze_speed(metrics["l_wrist_speed"])
+    r_speed_analysis = analyze_speed(metrics["r_wrist_speed"])
+    l_speed_analysis = analyze_speed(metrics["l_wrist_speed"])
+    
+    output["speed_analysis"]["r_wrist"] = r_speed_analysis
+    output["speed_analysis"]["l_wrist"] = l_speed_analysis
+    
+    # ARM COORDINATION ASSESSMENT
+    r_peak_frame = event_frame + r_speed_analysis.get("peak_frame_offset", 0)
+    l_peak_frame = event_frame + l_speed_analysis.get("peak_frame_offset", 0)
+    sync_offset = l_peak_frame - r_peak_frame
+    
+    r_peak = r_speed_analysis.get("peak_speed", 0)
+    l_peak = l_speed_analysis.get("peak_speed", 0)
+    speed_ratio = (l_peak / r_peak) if r_peak > 0 else 0
+    
+    arm_coordination = "SYNCHRONIZED" if abs(sync_offset) < 5 else "SLIGHT LAG" if sync_offset < 15 else "SIGNIFICANT LAG"
+    
+    output["speed_analysis"]["arm_coordination"] = {
+        "sync_offset_frames": int(sync_offset),
+        "speed_ratio_ndom_dom": round(speed_ratio, 3),
+        "coordination_assessment": arm_coordination,
+        "non_dom_peak_speed": round(l_peak, 4),
+        "dom_peak_speed": round(r_peak, 4)
+    }
 
     def find_velocity_peak(series):
         vel = [abs(series[i] - series[i-1]) for i in range(1, len(series))]
@@ -755,6 +778,119 @@ def build_pro_telemetry(raw_frames, sport_raw, action, event_frame, fps, camera_
     
     win = [f[0]['x'] for f in raw_frames[max(0, event_frame-5):min(total_frames, event_frame+5)] if f]
     output["balance_stability"] = {"nose_x_variance": round(float(np.var(win)), 4) if win else 0}
+    
+    # ===== BILATERAL ASYMMETRY ANALYSIS =====
+    bilateral_analysis = {}
+    bilateral_pairs = [
+        ("r_elbow", "l_elbow", "Elbow"),
+        ("r_knee", "l_knee", "Knee"),
+        ("r_hip", "l_hip", "Hip"),
+        ("r_shoulder_abduction", "l_shoulder_abduction", "Shoulder Abduction"),
+        ("r_wrist_speed", "l_wrist_speed", "Wrist Speed"),
+    ]
+    
+    for right_key, left_key, joint_name in bilateral_pairs:
+        if right_key in metrics and left_key in metrics:
+            right_vals = [v for v in metrics[right_key] if v is not None]
+            left_vals = [v for v in metrics[left_key] if v is not None]
+            
+            if right_vals and left_vals:
+                r_mean = np.mean(right_vals)
+                l_mean = np.mean(left_vals)
+                asymmetry = abs(r_mean - l_mean)
+                base = (r_mean + l_mean) / 2
+                asymmetry_pct = (asymmetry / base * 100) if base > 0 else 0
+                concern = "HIGH" if asymmetry_pct > 20 else "MEDIUM" if asymmetry_pct > 10 else "LOW"
+                
+                bilateral_analysis[joint_name] = {
+                    "right_mean": round(r_mean, 2),
+                    "left_mean": round(l_mean, 2),
+                    "absolute_difference": round(asymmetry, 2),
+                    "percent_difference": round(asymmetry_pct, 1),
+                    "concern_level": concern
+                }
+    
+    output["bilateral_analysis"] = bilateral_analysis
+    
+    # ===== ROM ANALYSIS =====
+    rom_analysis = {}
+    critical_metrics = [
+        "r_elbow", "l_elbow", "r_knee", "l_knee", 
+        "r_hip", "l_hip", "r_shoulder_abduction", "l_shoulder_abduction",
+        "trunk_forward_lean", "trunk_lateral_lean"
+    ]
+    
+    for metric in critical_metrics:
+        if metric in metrics:
+            values = [v for v in metrics[metric] if v is not None]
+            if values and len(values) > 5:
+                min_val = min(values)
+                max_val = max(values)
+                rom = max_val - min_val
+                quality = "FULL" if rom > 80 else "GOOD" if rom > 50 else "LIMITED" if "lean" not in metric else ("FULL" if rom > 60 else "GOOD" if rom > 30 else "LIMITED")
+                
+                rom_analysis[metric.replace("_", " ").title()] = {
+                    "minimum": round(min_val, 2),
+                    "maximum": round(max_val, 2),
+                    "range_of_motion": round(rom, 2),
+                    "quality_assessment": quality
+                }
+    
+    output["rom_analysis"] = rom_analysis
+    
+    # ===== MOTION PROFILES =====
+    motion_profiles = {}
+    profile_metrics = ["r_elbow", "l_elbow", "r_knee", "l_knee", "r_wrist_speed", "l_wrist_speed"]
+    
+    for metric in profile_metrics:
+        if metric in metrics:
+            values = metrics[metric]
+            if len(values) > 10:
+                sampled = [(i, values[i]) for i in range(0, len(values), max(1, len(values)//10)) if i < len(values) and values[i] is not None]
+                if sampled:
+                    motion_profiles[metric] = {
+                        "frames": [int(s[0]) for s in sampled],
+                        "values": [round(s[1], 2) for s in sampled],
+                        "min": round(min(values), 2),
+                        "max": round(max(values), 2),
+                        "mean": round(np.mean([v for v in values if v is not None]), 2)
+                    }
+    
+    output["motion_profiles"] = motion_profiles
+    
+    # ===== SMOOTHNESS ANALYSIS =====
+    smoothness_analysis = {}
+    
+    for metric_key in ["r_elbow", "l_elbow", "r_knee", "l_knee"]:
+        if metric_key in metrics:
+            values = [v for v in metrics[metric_key] if v is not None]
+            if len(values) > 3:
+                velocity = [0]
+                for i in range(1, len(values)):
+                    velocity.append(abs(values[i] - values[i-1]))
+                
+                acceleration = [0]
+                for i in range(1, len(velocity)):
+                    acceleration.append(abs(velocity[i] - velocity[i-1]))
+                
+                jerk = [0]
+                for i in range(1, len(acceleration)):
+                    jerk.append(abs(acceleration[i] - acceleration[i-1]))
+                
+                avg_jerk = np.mean(jerk) if jerk else 0
+                max_jerk = np.max(jerk) if jerk else 0
+                smoothness_score = max(0, 1 - (avg_jerk / max_jerk)) if max_jerk > 0 else 1.0
+                smoothness_level = "VERY SMOOTH" if smoothness_score > 0.8 else "SMOOTH" if smoothness_score > 0.6 else "MODERATE" if smoothness_score > 0.4 else "ERRATIC"
+                
+                smoothness_analysis[metric_key.replace("_", " ").title()] = {
+                    "smoothness_score": round(smoothness_score, 3),
+                    "smoothness_level": smoothness_level,
+                    "peak_acceleration": round(np.max(acceleration), 4) if acceleration else 0,
+                    "peak_jerk": round(max_jerk, 6)
+                }
+    
+    output["smoothness_analysis"] = smoothness_analysis
+    
     return output
 
 # ============================================================================
