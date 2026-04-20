@@ -36,28 +36,261 @@ class NumpyEncoder(json.JSONEncoder):
 # 2. REPORT GENERATION FUNCTIONS (Original)
 # ============================================================================
 
-def generate_pro_report(brief_content):
+def generate_sport_specific_prompt(sport, action, brief_content):
+    """
+    Generates a sport and action-specific coaching prompt dynamically.
+    
+    Args:
+        sport: Sport name (e.g., "TENNIS", "GOLF", "GYM")
+        action: Action type (e.g., "SERVE", "DRIVE", "SQUAT")
+        brief_content: The telemetry brief text
+    
+    Returns:
+        Tuple of (instructions, enhanced_brief)
+    """
+    
+    # Sport-specific context library
+    SPORT_COACHING_CONTEXT = {
+        "TENNIS": {
+            "discipline": "Racket Sport",
+            "primary_chain": "Legs → Hips → Trunk → Shoulder → Elbow → Wrist",
+            "key_metrics": ["racket_speed", "kinetic_chain_sequencing", "trunk_rotation", "hip_shoulder_separation"],
+            "common_issues": ["poor hip-shoulder separation", "early arm movement", "insufficient trunk rotation", "foot placement"],
+            "performance_indicators": ["first serve percentage", "racket head speed", "ball impact timing", "follow-through completion"],
+            "injury_risks": ["rotator cuff strain", "lower back injury", "ankle sprain"],
+        },
+        "PADEL": {
+            "discipline": "Racket Sport",
+            "primary_chain": "Legs → Hips → Trunk → Shoulder → Elbow → Wrist",
+            "key_metrics": ["racket_speed", "kinetic_chain_sequencing", "shoulder_stability", "wrist_control"],
+            "common_issues": ["excessive wrist movement", "poor footwork", "uncontrolled arm swing", "weak loading position"],
+            "performance_indicators": ["shot consistency", "racket speed", "body control", "positioning"],
+            "injury_risks": ["tennis elbow", "shoulder impingement", "wrist strain"],
+        },
+        "PICKLEBALL": {
+            "discipline": "Racket Sport",
+            "primary_chain": "Legs → Hips → Trunk → Shoulder → Elbow → Wrist",
+            "key_metrics": ["racket_control", "wrist_stability", "body_balance", "footwork"],
+            "common_issues": ["excessive arm movement", "poor stance", "wrist instability", "timing issues"],
+            "performance_indicators": ["shot accuracy", "control", "consistency", "positioning"],
+            "injury_risks": ["wrist strain", "elbow strain", "shoulder strain"],
+        },
+        "BADMINTON": {
+            "discipline": "Racket Sport",
+            "primary_chain": "Legs → Hips → Trunk → Shoulder → Elbow → Wrist",
+            "key_metrics": ["racket_speed", "shuttle_control", "footwork", "court_positioning"],
+            "common_issues": ["poor footwork", "late timing", "weak loading", "incorrect grip transition"],
+            "performance_indicators": ["shuttle speed", "accuracy", "footwork efficiency", "court coverage"],
+            "injury_risks": ["ankle injury", "shoulder strain", "knee strain"],
+        },
+        "SQUASH": {
+            "discipline": "Racket Sport",
+            "primary_chain": "Legs → Hips → Trunk → Shoulder → Elbow → Wrist",
+            "key_metrics": ["racket_speed", "court_positioning", "footwork", "shot_selection"],
+            "common_issues": ["poor positioning", "late swing", "insufficient rotation", "weak footwork"],
+            "performance_indicators": ["shot accuracy", "court control", "movement efficiency", "rally performance"],
+            "injury_risks": ["shoulder strain", "knee injury", "ankle sprain"],
+        },
+        "GOLF": {
+            "discipline": "Striking Sport",
+            "primary_chain": "Legs → Hips → Trunk → Shoulders → Arms → Club",
+            "key_metrics": ["club_head_speed", "hip_shoulder_separation", "swing_plane", "weight_transfer"],
+            "common_issues": ["poor hip rotation", "early wrist release", "sway", "insufficient weight transfer"],
+            "performance_indicators": ["ball_distance", "accuracy", "consistency", "launch_angle"],
+            "injury_risks": ["lower back strain", "elbow strain", "shoulder strain"],
+        },
+        "GYM": {
+            "discipline": "Strength/Conditioning",
+            "primary_chain": "Ground → Legs → Core → Upper Body",
+            "key_metrics": ["movement_symmetry", "range_of_motion", "stability", "alignment"],
+            "common_issues": ["asymmetrical loading", "poor form", "insufficient depth", "core instability"],
+            "performance_indicators": ["strength gains", "form quality", "stability", "symmetry"],
+            "injury_risks": ["lower back strain", "knee strain", "shoulder impingement"],
+        },
+        "YOGA": {
+            "discipline": "Flexibility/Mind-Body",
+            "primary_chain": "Ground → Alignment → Breathing → Flow",
+            "key_metrics": ["alignment", "stability", "flexibility", "balance"],
+            "common_issues": ["poor alignment", "over-extension", "instability", "breath control"],
+            "performance_indicators": ["form quality", "balance", "flexibility", "mind-body connection"],
+            "injury_risks": ["overstretching", "wrist strain", "shoulder impingement"],
+        },
+        "SOCCER": {
+            "discipline": "Kicking Sport",
+            "primary_chain": "Standing Leg → Hips → Trunk → Kicking Leg → Foot",
+            "key_metrics": ["ball_speed", "accuracy", "leg_power", "body_balance"],
+            "common_issues": ["poor stance", "insufficient hip rotation", "weak follow-through", "balance issues"],
+            "performance_indicators": ["ball_speed", "accuracy", "consistency", "placement"],
+            "injury_risks": ["groin strain", "knee injury", "ankle injury"],
+        },
+        "BOXING/MMA": {
+            "discipline": "Combat Sport",
+            "primary_chain": "Legs → Hips → Core → Shoulders → Arms → Fists",
+            "key_metrics": ["punch_speed", "hip_rotation", "balance", "footwork"],
+            "common_issues": ["dropped hands", "poor footwork", "telegraphed movements", "power loss"],
+            "performance_indicators": ["punch_speed", "combination_flow", "defense", "footwork_efficiency"],
+            "injury_risks": ["hand injury", "rotator cuff strain", "cervical strain"],
+        },
+        "ATHLETICS/RUNNING": {
+            "discipline": "Movement Science",
+            "primary_chain": "Ground → Legs → Core → Upper Body → Arms",
+            "key_metrics": ["stride_length", "cadence", "stability", "propulsion"],
+            "common_issues": ["overstriding", "poor cadence", "instability", "asymmetry"],
+            "performance_indicators": ["speed", "efficiency", "consistency", "endurance"],
+            "injury_risks": ["knee injury", "shin splints", "hip strain"],
+        },
+        "BASEBALL": {
+            "discipline": "Throwing Sport",
+            "primary_chain": "Legs → Hips → Trunk → Shoulder → Elbow → Wrist",
+            "key_metrics": ["throwing_velocity", "hip_shoulder_separation", "arm_angle", "follow_through"],
+            "common_issues": ["early arm movement", "poor stride", "insufficient hip rotation", "arm lag"],
+            "performance_indicators": ["throw_velocity", "accuracy", "consistency", "arm health"],
+            "injury_risks": ["shoulder impingement", "ulnar collateral ligament strain", "rotator cuff strain"],
+        },
+        "AMERICAN FOOTBALL": {
+            "discipline": "Throwing Sport",
+            "primary_chain": "Legs → Hips → Trunk → Shoulder → Elbow → Wrist",
+            "key_metrics": ["throwing_velocity", "accuracy", "release_point", "footwork"],
+            "common_issues": ["poor stance", "timing issues", "weak release", "footwork errors"],
+            "performance_indicators": ["pass_completion", "ball_velocity", "accuracy", "consistency"],
+            "injury_risks": ["shoulder strain", "elbow strain", "knee injury"],
+        },
+        "ICE HOCKEY": {
+            "discipline": "Racket Sport (Stick-based)",
+            "primary_chain": "Legs → Hips → Trunk → Shoulders → Arms → Stick",
+            "key_metrics": ["shot_speed", "accuracy", "body_balance", "footwork"],
+            "common_issues": ["poor weight transfer", "weak loading", "timing issues", "stick control"],
+            "performance_indicators": ["shot_speed", "accuracy", "consistency", "ice mobility"],
+            "injury_risks": ["shoulder strain", "knee injury", "ankle injury"],
+        },
+        "TABLE TENNIS": {
+            "discipline": "Racket Sport",
+            "primary_chain": "Legs → Hips → Trunk → Shoulder → Elbow → Wrist",
+            "key_metrics": ["paddle_speed", "footwork", "timing", "spin_control"],
+            "common_issues": ["timing issues", "poor footwork", "weak positioning", "inconsistent contact"],
+            "performance_indicators": ["shot_speed", "spin_production", "accuracy", "consistency"],
+            "injury_risks": ["wrist strain", "elbow strain", "shoulder strain"],
+        },
+        "MARTIAL ARTS": {
+            "discipline": "Combat Sport",
+            "primary_chain": "Legs → Hips → Core → Shoulders → Arms → Limbs",
+            "key_metrics": ["strike_speed", "balance", "hip_rotation", "footwork"],
+            "common_issues": ["poor balance", "telegraphed strikes", "weak hip engagement", "footwork issues"],
+            "performance_indicators": ["strike_speed", "accuracy", "balance", "technique_quality"],
+            "injury_risks": ["hand injury", "rotator cuff strain", "knee injury"],
+        },
+    }
+    
+    # Get sport context, default if not in library
+    context = SPORT_COACHING_CONTEXT.get(sport.upper(), {
+        "discipline": "General Sport",
+        "primary_chain": "Standard biomechanical chain",
+        "key_metrics": ["general_performance_metrics"],
+        "common_issues": ["performance_optimization"],
+        "performance_indicators": ["overall_quality"],
+        "injury_risks": ["general_injury_prevention"],
+    })
+    
+    # Build dynamic prompt
+    base_instructions = f"""
+Act as both a professional {context['discipline'].lower()} coach and biomechanical engineer.
+
+You are analyzing a {sport.upper()} {action.upper()} based on motion capture telemetry data.
+
+SPORT & ACTION CONTEXT:
+- Sport: {sport.upper()}
+- Action: {action.upper()}
+- Primary kinetic chain: {context['primary_chain']}
+- Key performance metrics for this action: {', '.join(context['key_metrics'])}
+- Common technical issues in this action: {', '.join(context['common_issues'])}
+- Performance indicators to assess: {', '.join(context['performance_indicators'])}
+- Injury prevention focus: {', '.join(context['injury_risks'])}
+
+MANDATORY REPORT STRUCTURE:
+1. Executive Summary (2-3 sentences on overall {action.lower()} quality)
+2. Performance Scores table: 
+   - Category | Score/100 | vs Benchmark | Assessment
+   - Include scores for: Technique, Timing, Power, Balance/Stability, Follow-Through, Kinetic Chain, Consistency
+3. Key Measurements table: 
+   - Metric | Value | Benchmark | Status (Good/Attention/Issue)
+   - Compare all provided measurements to benchmarks
+4. Movement Progression Analysis:
+   - Describe the movement from START → MID-POINT → FINISH
+   - Identify timing of key events
+   - Assess smoothness and efficiency
+5. Kinetic Chain Assessment:
+   - Analyze sequential energy transfer through: {context['primary_chain']}
+   - Identify any breaks or delays in the chain
+   - Assess efficiency of each segment
+6. Critical Technical Issues (max 3):
+   - Issue | Impact | Severity (HIGH/MEDIUM/LOW)
+   - Explain the specific biomechanical problem
+   - Note if it affects performance vs safety
+7. Coaching Recommendations (max 5):
+   - Recommendation | Priority (HIGH/MEDIUM/LOW) | Specific Cue | Progressive Drill
+   - Focus on: {', '.join(context['common_issues'])}
+8. Injury Risk Assessment:
+   - Identify any movement patterns suggesting injury risk
+   - Areas of concern: {', '.join(context['injury_risks'])}
+   - Recommendations for prevention
+9. Summary:
+   - One sentence on current level
+   - Next 3 priorities for improvement
+   - Estimated timeline to see improvement
+
+CRITICAL REQUIREMENTS:
+- Always reference benchmark values from the brief when available
+- Identify bilateral asymmetries (left vs right) and their impact
+- Explain WHY issues matter, not just WHAT to do
+- Distinguish between TIMING problems vs STRENGTH/MOBILITY problems
+- Base all recommendations strictly on the telemetry data provided
+- Use professional, direct language but remain encouraging
+- Note any data quality limitations that affect interpretation
+
+TONE: Professional, technical but accessible, positive but honest.
+LENGTH: 900-1100 words
+START WITH: "VECTOR VICTOR AI - BIO MECHANICAL ANALYSIS"
+"""
+    
+    return base_instructions
+
+def generate_pro_report(brief_content, sport="GENERAL", action="MOVEMENT"):
+    """
+    Enhanced report generation with sport-specific context.
+    
+    Args:
+        brief_content (str): The telemetry brief text from generate_brief()
+        sport (str): Sport name (TENNIS, GOLF, GYM, etc.)
+        action (str): Action type (SERVE, DRIVE, SQUAT, etc.)
+    
+    Returns:
+        str: Generated coaching report text
+    """
     try:
-        supported_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+        # Get available models
+        supported_models = [m.name for m in genai.list_models() 
+                          if 'generateContent' in m.supported_generation_methods]
         priority = ['models/gemini-1.5-pro', 'models/gemini-1.5-flash']
-        selected_model = next((p for p in priority if p in supported_models), supported_models[0] if supported_models else None)
+        selected_model = next((p for p in priority if p in supported_models), 
+                            supported_models[0] if supported_models else None)
             
         if not selected_model:
             return "⚠️ AI Generation Error: No suitable Gemini models found."
-
+ 
+        # Initialize model
         report_model = genai.GenerativeModel(selected_model)
-        instructions = """
-        Act as a sports coach, Create a professional coaching report based on the telemetry provided.
-        START THE REPORT WITH THIS EXACT HEADER: "VECTOR VICTOR AI - BIO MECHANICAL ANALYSIS"
-        Give a short description of what a coach sees (good and bad) and would advice the athlete to get batter.
-        Include Tables for scores, Phase Analysis, and specific Coaching Drills.
-        Use professional, direct language but be positive and encouraging.
-        As a biomechanical engineer, provide the data backing up the coach's recommendations as the last section of the document.
-        """
+        
+        # Generate sport-specific instructions
+        instructions = generate_sport_specific_prompt(sport, action)
+        
+        # Call API with enhanced prompt and brief content
         response = report_model.generate_content([instructions, brief_content])
         return response.text
+        
     except Exception as e:
         return f"⚠️ AI Generation Error: {str(e)}"
+ 
+
 
 def create_docx_report(text, sport_name):
     doc = Document()
@@ -1047,7 +1280,12 @@ with tab3:
             st.markdown("---")
             if st.button("🤖 GENERATE AI COACHING REPORT", type="primary", width="stretch"):
                 with st.status("AI IS ANALYZING...") as status:
-                    report_text = generate_pro_report(st.session_state["brief"])
+                    #report_text = generate_pro_report(st.session_state["brief"])
+                    report_text = generate_pro_report(
+                    st.session_state["brief"],
+                    sport=st.session_state["sport"],
+                    action=st.session_state["action"]
+                    )
                     st.session_state["report_text"] = report_text
                     status.update(label="REPORT COMPLETE!", state="complete")
             
