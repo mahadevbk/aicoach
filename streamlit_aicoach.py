@@ -21,6 +21,51 @@ from fpdf import FPDF
 from fpdf.enums import XPos, YPos
 
 # ============================================================================
+# PAGE CONFIG & STYLING
+# ============================================================================
+
+st.set_page_config(page_title="Vector Victor AI", page_icon="⚡", layout="wide", initial_sidebar_state="collapsed")
+
+st.markdown("""
+<style>
+    /* Fix file uploader spacing and overlap issues */
+    [data-testid="stFileUploader"] {
+        margin-top: 1rem;
+        margin-bottom: 1rem;
+    }
+    
+    [data-testid="stFileUploader"] > div:first-child {
+        padding: 1rem;
+        border-radius: 8px;
+        min-height: 60px;
+        display: flex;
+        align-items: center;
+        justify-content: flex-start;
+    }
+    
+    /* Ensure file uploader label has proper width */
+    [data-testid="stFileUploader"] label {
+        width: 100%;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    
+    /* Button full width */
+    button { 
+        width: 100% !important;
+        min-height: 48px !important;
+    }
+    
+    /* Better spacing for info/success messages */
+    .stSuccess, .stInfo, .stCaption {
+        margin-top: 0.5rem;
+        margin-bottom: 0.5rem;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+# ============================================================================
 # 1. CORE UTILITIES & ENCODERS
 # ============================================================================
 
@@ -822,15 +867,27 @@ with tab1:
     selected_action = st.selectbox("SELECT ACTION", SPORT_CONFIG[selected_sport], key="action_sel")
     
     st.markdown("#### PRIMARY VIEW", unsafe_allow_html=True)
+    st.markdown("📹 Upload your main angle video", unsafe_allow_html=True)
     u1 = st.file_uploader("UPLOAD MAIN ANGLE", type=["mp4","mov"], key="u1_upload", label_visibility="collapsed")
-    if u1: display_file_info(u1)
+    if u1: 
+        display_file_info(u1)
+        st.success("✓ Primary video loaded")
+    else:
+        st.info("Choose a video file to continue")
+    
+    st.divider()
     
     is_stereo = st.toggle("STEREOGRAPHIC MODE (DUAL VIEW)", value=False, key="st_toggle")
     u2 = None
     if is_stereo:
         st.markdown("#### SECONDARY VIEW", unsafe_allow_html=True)
+        st.markdown("📹 Upload your secondary angle video (optional)", unsafe_allow_html=True)
         u2 = st.file_uploader("UPLOAD SECOND ANGLE", type=["mp4","mov"], key="u2_upload", label_visibility="collapsed")
-        if u2: display_file_info(u2)
+        if u2: 
+            display_file_info(u2)
+            st.success("✓ Secondary video loaded")
+        else:
+            st.info("Choose a video file (optional)")
 
     if u1:
         if st.button("PROCEED TO ANALYSIS", type="primary", use_container_width=True):
