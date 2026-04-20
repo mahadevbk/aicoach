@@ -766,16 +766,83 @@ st.markdown("<h1>Vector Victor AI</h1>", unsafe_allow_html=True)
 st.markdown("<p class='hero-sub'>Deep form Vector and Bio mechanics AI engine</p>", unsafe_allow_html=True)
 
 SPORT_CONFIG = {
-    "TENNIS 🎾": ["Serve", "Forehand", "Backhand"], "PADEL 🎾": ["Bandeja", "Vibora", "Smash"],
-    "PICKLEBALL 🥒": ["Serve", "Dink", "Third Shot Drop", "Volley"], "GOLF ⛳": ["Driver", "Iron", "Putter"],
-    "BADMINTON 🏸": ["Smash", "Drop Shot", "Clear"], "CRICKET 🏏": ["Drive", "Bowling", "Pull Shot"],
-    "GYM 🏋️": ["Squat", "Deadlift", "Bench Press"], "YOGA 🧘": ["Warrior", "Tree Pose", "Sun Salutation"]
+    "TENNIS 🎾": [
+        "First Serve", "Second Serve", "Kick Serve", "Slice Serve", 
+        "Forehand Flat", "Forehand Topspin", "Forehand Slice", 
+        "Backhand One-Handed", "Backhand Two-Handed", "Backhand Slice", 
+        "Forehand Volley", "Backhand Volley", "Overhead Smash", 
+        "Drop Shot", "Lob", "Return of Serve"
+    ],
+    "PADEL 🎾": [
+        "Serve", "Forehand Groundstroke", "Backhand Groundstroke",
+        "Bandeja", "Vibora", "Flat Smash", "Smash 'por 3'", "Smash 'por 4'",
+        "Forehand Volley", "Backhand Volley", "Bajada de Pared", 
+        "Chiquita", "Globo (Lob)", "Contrapared"
+    ],
+    "PICKLEBALL 🥒": [
+        "Serve (Volley)", "Serve (Drop)", "Dink (Straight)", "Dink (Cross-court)",
+        "Third Shot Drop", "Third Shot Drive", "Speed Up",
+        "Kitchen Volley", "Punch Volley", "Overhead Slam",
+        "Reset Shot", "Backhand Flick", "Lob"
+    ],
+    "GOLF ⛳": [
+        "Driver Tee Shot", "Fairway Wood", "Long Iron", "Short Iron",
+        "Pitch Shot", "Chipping", "Sand Bunker Shot", "Putter Stroke",
+        "Full Backswing", "Downswing Transition", "Follow Through"
+    ],
+    "BADMINTON 🏸": [
+        "High Serve", "Low Serve", "Flick Serve",
+        "Forehand Smash", "Backhand Smash", "Jump Smash",
+        "Clear (Lob)", "Drop Shot", "Net Kill", "Net Lift",
+        "Drive Shot", "Around-the-head Shot"
+    ],
+    "CRICKET 🏏": [
+        "Forward Defense", "Cover Drive", "Pull Shot", "Hook Shot",
+        "Cut Shot", "Sweep Shot", "Fast Bowling Action", "Spin Bowling Action",
+        "Wicket-keeping Stance", "Power Hitting (Slog)", "High Catching"
+    ],
+    "FOOTBALL/SOCCER ⚽": [
+        "Instep Drive (Power)", "Side-foot Pass", "Curled Shot", 
+        "Long Ball/Switch", "Heading (Standing)", "Heading (Jumping)",
+        "Goalkeeper Dive", "Goalkeeper Goal Kick", "Throw-in",
+        "Penalty Kick", "Volley", "First Touch Control"
+    ],
+    "BASKETBALL 🏀": [
+        "Jump Shot", "Three-Pointer", "Free Throw", 
+        "Layup (Right/Left)", "Driving Dunk", "Chest Pass", 
+        "Bounce Pass", "Overhead Pass", "Defensive Slide",
+        "Post-up Turnaround", "Rebounding Box-out"
+    ],
+    "BOXING/MMA 🥊": [
+        "Jab", "Cross", "Lead Hook", "Rear Hook", 
+        "Uppercut", "Lead Roundhouse Kick", "Rear Roundhouse Kick",
+        "Front Kick (Teep)", "Shoulder Roll", "Slip/Bob and Weave",
+        "Double Leg Takedown", "Sprawl"
+    ],
+    "GYM 🏋️": [
+        "Back Squat", "Front Squat", "Deadlift (Conventional)", "Deadlift (Sumo)",
+        "Bench Press", "Overhead Press", "Barbell Row", "Pull-up",
+        "Clean and Jerk", "Snatch", "Kettlebell Swing", "Lunge"
+    ],
+    "YOGA 🧘": [
+        "Downward Dog", "Warrior I", "Warrior II", "Warrior III",
+        "Tree Pose", "Triangle Pose", "Crow Pose", "Plank/Chaturanga",
+        "Cobra/Upward Dog", "Half Moon Pose", "Bridge Pose", "Wheel Pose"
+    ],
+    "ATHLETICS/RUNNING 🏃": [
+        "Sprint Start (Blocks)", "Max Velocity Phase", "Distance Running Gate",
+        "Long Jump Takeoff", "High Jump Fosbury Flop", "Hurdle Clearance",
+        "Shot Put Glide", "Shot Put Rotational", "Javelin Throw"
+    ]
 }
 
-tabs = st.tabs(list(SPORT_CONFIG.keys()))
+# DYNAMIC TAB GENERATION
+sport_names = list(SPORT_CONFIG.keys())
+tabs = st.tabs(sport_names)
 
-for i, (sport, actions) in enumerate(SPORT_CONFIG.items()):
-    with tabs[i]:
+for i, tab in enumerate(tabs):
+    sport = sport_names[i]
+    with tab:
         st.markdown("""
             <div class="glass-card">
                 <div style="color: #ccff00; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px;">🚀 Quick Start Guide</div>
@@ -788,6 +855,22 @@ for i, (sport, actions) in enumerate(SPORT_CONFIG.items()):
                 </div>
             </div>
         """, unsafe_allow_html=True)
+        col_ui, col_viz = st.columns([1, 2])
+        with col_ui:
+            st.markdown(f"### {sport} Settings")
+            # This automatically populates the dropdown based on the exhaustive list above
+            action = st.selectbox(
+                f"Select {sport} Action", 
+                SPORT_CONFIG[sport], 
+                key=f"action_{sport}"
+            )
+            
+            # The rest of your existing UI logic (Uploaders, Sliders, etc.)
+            uploaded_file = st.file_uploader(
+                f"Upload {sport} Video", 
+                type=['mp4', 'mov', 'avi'], 
+                key=f"file_{sport}"
+            )
         c1, c2 = st.columns([1, 2])
         res_key = f"data_{sport}"
         with c1:
