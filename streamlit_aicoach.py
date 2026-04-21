@@ -195,7 +195,7 @@ def generate_sport_specific_prompt(sport, action, brief_content):
     base_instructions = f"""
 Act as both a professional {context['discipline'].lower()} coach and biomechanical engineer.
 
-You are analyzing a {sport.upper()} {action.upper()} based on motion capture telemetry data.
+You are analyzing a {sport.upper()} {action.upper()} based on motion capture telemetry data. Be encouraging and positive
 
 SPORT & ACTION CONTEXT:
 - Sport: {sport.upper()}
@@ -1254,7 +1254,12 @@ with tab2:
                 
                 raw_interp = interpolate_landmarks(s['d1']['raw'])
                 tele_opt = build_pro_telemetry(raw_interp, sport, action, sl1, s['d1']['fps'], "dual" if s['p2'] else "lead", handedness_override=h_val)
-                st.session_state["brief"] = generate_brief(tele_opt)
+                #st.session_state["brief"] = generate_brief(tele_opt)
+                st.session_state["brief"] = generate_brief(
+					tele_opt,
+					sport=sport,
+					action=action
+				)
                 st.session_state["sl1_val"] = sl1 # For efficiency calc
             
             # INFO FOR USER
