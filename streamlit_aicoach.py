@@ -253,6 +253,15 @@ LENGTH: 900-1100 words
 START WITH: "VECTOR VICTOR AI - BIO MECHANICAL ANALYSIS"
 """
     
+    if action.upper() == "GENERAL RALLY":
+        base_instructions += """
+SPECIAL INSTRUCTION FOR GENERAL RALLY:
+The telemetry data includes 'Detected Actions' with specific frame numbers in the metadata. 
+1. Cross-reference the vector peaks at these frames with the action labels (e.g., Forehand vs Backhand).
+2. Analyze the transition efficiency between these detected actions.
+3. Compare the biomechanics of each individual shot detected within this single video.
+"""
+
     return base_instructions
 
 def generate_pro_report(brief_content, sport="GENERAL", action="MOVEMENT"):
@@ -693,6 +702,39 @@ def detect_handedness(raw_frames):
     r_var = np.var(r_wrist_speeds) if len(r_wrist_speeds) > 1 else 0
     l_var = np.var(l_wrist_speeds) if len(l_wrist_speeds) > 1 else 0
     return "right" if r_var > l_var else "left"
+
+# Add this to Section 4: BIOMECHANIC CALCULATORS
+ACTION_SIGNATURES = {
+    "TENNIS": {
+        "SERVE": {"metric": "r_wrist_speed", "threshold": 0.8, "min_elbow": 140},
+        "FOREHAND DRIVE": {"metric": "r_wrist_speed", "threshold": 0.5, "plane": "coronal"},
+        "BACKHAND DRIVE": {"metric": "l_wrist_speed", "threshold": 0.5},
+        "FOREHAND SLICE": {"metric": "r_wrist_speed", "threshold": 0.3, "lean": "forward"},
+    },
+    # Add other sports as needed
+}
+
+def auto_detect_actions(metrics, sport):
+    """Detects frame indices where key actions occur based on telemetry peaks."""
+    detected = []
+    # Clean sport name just in case
+    sport = "".join([c for c in sport if ord(c) < 128]).strip().upper()
+    if sport not in ACTION_SIGNATURES: return detected
+    
+    # Example logic: Find peaks in wrist speed that match sport signatures
+    for action_name, sig in ACTION_SIGNATURES[sport].items():
+        speeds = metrics.get(sig['metric'], [])
+        # Find local maxima above threshold
+        for i in range(1, len(speeds)-1):
+            if speeds[i] and speeds[i] > sig['threshold']:
+                # Basic peak detection
+                prev_val = speeds[i-1] if speeds[i-1] is not None else 0
+                next_val = speeds[i+1] if speeds[i+1] is not None else 0
+                if speeds[i] > prev_val and speeds[i] > next_val:
+                    detected.append({"action": action_name, "frame": i})
+    
+    # Deduplicate and sort by frame
+    return sorted(detected, key=lambda x: x['frame'])
 
 def build_pro_telemetry(raw_frames, sport_raw, action, event_frame, fps, camera_mode, handedness_override=None):
     total_frames = len(raw_frames)
@@ -1271,9 +1313,15 @@ with tab1:
             st.session_state["u2"] = u2
             st.session_state["sport"] = selected_sport
             st.session_state["action"] = selected_action
-            
-            model_task = download_model()
-            t1_p = os.path.join(tempfile.gettempdir(), f"l_raw.mp4")
+
+            # Clear previous auto-detection data
+            if "manual_actions" in st.session_state: del st.session_state["manual_actions"]
+            if "tele_opt_preview" in st.session_state: del st.session_state["tele_opt_preview"]
+            if "tele_opt" in st.session_state: del st.session_state["tele_opt"]
+            if "report_text" in st.session_state: del st.session_state["report_text"]
+            if "final_video" in st.session_state: del st.session_state["final_video"]
+
+            model_task = download_model()            t1_p = os.path.join(tempfile.gettempdir(), f"l_raw.mp4")
             with open(t1_p, "wb") as f: f.write(u1.getbuffer())
             
             with st.status(f"ANALYZING {selected_sport.upper()}...") as status:
@@ -1329,6 +1377,43 @@ with tab2:
                     st.image(np.hstack((cv2.resize(i1, (w1_n, h_t)), cv2.resize(i2, (w2_n, h_t)))), width="stretch")
             else:
                 st.image(i1, width="stretch")
+        
+        # --- AUTO-DETECTED ACTIONS (For General Rally) ---
+        sport_clean = "".join([c for c in sport if ord(c) < 128]).strip().upper()
+        action_upper = action.upper()
+        
+        if sport_clean == "TENNIS" and action_upper == "GENERAL RALLY":
+            st.markdown("#### 🤖 AUTO-DETECTED KEY MOTIONS")
+            
+            # Need metrics for auto-detection
+            if "tele_opt_preview" not in st.session_state:
+                with st.spinner("SCANNING FOR MOTIONS..."):
+                    raw_interp = interpolate_landmarks(s['d1']['raw'])
+                    # Build a preview telemetry object to get metrics
+                    st.session_state["tele_opt_preview"] = build_pro_telemetry(raw_interp, sport, action, sl1, s['d1']['fps'], "lead")
+            
+            # Initialize session state for actions if not present
+            if "manual_actions" not in st.session_state:
+                st.session_state.manual_actions = auto_detect_actions(
+                    st.session_state["tele_opt_preview"]["metrics"], sport_clean
+                )
+
+            if st.session_state.manual_actions:
+                # Display editable frames for detected actions
+                # Use fewer columns if many actions detected
+                num_actions = len(st.session_state.manual_actions)
+                cols = st.columns(min(num_actions, 4))
+                for idx, act in enumerate(st.session_state.manual_actions):
+                    with cols[idx % min(num_actions, 4)]:
+                        new_frame = st.number_input(
+                            f"{act['action']}", 
+                            value=int(act['frame']), 
+                            step=1, 
+                            key=f"act_{idx}"
+                        )
+                        st.session_state.manual_actions[idx]['frame'] = new_frame
+            else:
+                st.info("No specific shots auto-detected. You can continue with general analysis.")
 
         if st.button("🚀 START FINAL BIOMECHANICAL RENDER", type="primary", width="stretch"):
             with st.spinner("PROCESSING VECTORS..."):
@@ -1341,6 +1426,11 @@ with tab2:
                 
                 raw_interp = interpolate_landmarks(s['d1']['raw'])
                 tele_opt = build_pro_telemetry(raw_interp, sport, action, sl1, s['d1']['fps'], "dual" if s['p2'] else "lead", handedness_override=h_val)
+                
+                # --- INJECT DETECTED ACTIONS ---
+                if "manual_actions" in st.session_state:
+                    tele_opt["metadata"]["detected_actions"] = st.session_state.manual_actions
+                
                 st.session_state["tele_opt"] = tele_opt
                 #st.session_state["brief"] = generate_brief(tele_opt)
                 st.session_state["brief"] = generate_brief.generate_brief(

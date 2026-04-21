@@ -333,6 +333,9 @@ def generate_brief(tele_opt, sport="GENERAL", action="MOVEMENT"):
     
     # Extract telemetry data
     metadata = tele_opt.get("metadata", {})
+    detected_actions = metadata.get("detected_actions", [])
+    action_frames_str = ", ".join([f"{a['action']}@f{a['frame']}" for a in detected_actions]) if detected_actions else "none"
+
     metrics = tele_opt.get("metrics", {})
     event_snapshot = tele_opt.get("event_snapshot", {})
     phase_snapshots = tele_opt.get("phase_snapshots", {})
@@ -357,6 +360,7 @@ Data quality:   clean
 ## SECTION 2 — ACTION CONTEXT
 Sport context:  {sport} {action}
 Event moment represents: {event_description}
+Detected key actions: {action_frames_str}
 Dominant side is the primary limb (arm/leg)
 Phase vocabulary: {', '.join([f'{name}={offset}fr' for name, offset in phases])}
 Benchmarks: {', '.join([f'{k} {v[0]}-{v[1]}{v[2]}' for k, v in list(benchmarks.items())[:4]]) if benchmarks else 'standard'}
