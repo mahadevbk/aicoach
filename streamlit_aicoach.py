@@ -378,11 +378,14 @@ def create_docx_report(text, sport_name, action, hand):
                 title, desc = content.split(':', 1)
                 run_t = p.add_run(title + ":")
                 run_t.bold = True
+                run_t.font.name = 'Arial'
                 run_t.font.size = Pt(8)
                 run_d = p.add_run(desc)
+                run_d.font.name = 'Arial'
                 run_d.font.size = Pt(8)
             else:
                 run = p.add_run(content)
+                run.font.name = 'Arial'
                 run.font.size = Pt(8)
         else:
             p = doc.add_paragraph()
@@ -391,10 +394,12 @@ def create_docx_report(text, sport_name, action, hand):
                 parts = clean_line.split('**')
                 for i, part in enumerate(parts):
                     run = p.add_run(part)
+                    run.font.name = 'Arial'
                     run.font.size = Pt(8)
                     if i % 2 == 1: run.bold = True
             else:
                 run = p.add_run(clean_line)
+                run.font.name = 'Arial'
                 run.font.size = Pt(8)
                 
     bio = io.BytesIO()
