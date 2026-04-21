@@ -12,7 +12,7 @@ import io
 import urllib.request
 import subprocess
 import time
-from generate_brief import generate_brief
+import generate_brief
 import google.generativeai as genai
 from docx import Document
 from docx.shared import Pt, RGBColor
@@ -1255,7 +1255,7 @@ with tab2:
                 raw_interp = interpolate_landmarks(s['d1']['raw'])
                 tele_opt = build_pro_telemetry(raw_interp, sport, action, sl1, s['d1']['fps'], "dual" if s['p2'] else "lead", handedness_override=h_val)
                 #st.session_state["brief"] = generate_brief(tele_opt)
-                st.session_state["brief"] = generate_brief(
+                st.session_state["brief"] = generate_brief.generate_brief(
 					tele_opt,
 					sport=sport,
 					action=action
