@@ -1303,7 +1303,13 @@ with tab3:
             with zipfile.ZipFile(z_buf, "w") as zf:
                 zf.write(st.session_state["final_video"], "analysis.mp4")
                 zf.writestr("AI_BRIEF.txt", st.session_state["brief"])
-            st.download_button("📥 DOWNLOAD ZIP (VIDEO + DATA)", z_buf.getvalue(), f"{sport}_DATA.zip", width="stretch")
+            
+            cz1, cz2 = st.columns(2)
+            with cz1:
+                st.download_button("📥 DOWNLOAD ZIP (VIDEO + DATA)", z_buf.getvalue(), f"{sport}_DATA.zip", width="stretch")
+            with cz2:
+                json_data = json.dumps(st.session_state["tele_opt"], indent=2)
+                st.download_button("💾 RAW JSON", json_data, f"{sport}_TELEMETRY.json", "application/json", width="stretch")
             
             st.markdown("---")
             if st.button("🤖 GENERATE AI COACHING REPORT", type="primary", width="stretch"):
@@ -1320,16 +1326,13 @@ with tab3:
             if "report_text" in st.session_state:
                 st.markdown(st.session_state["report_text"])
                 st.markdown("#### EXPORT DOCUMENTS")
-                c1, c2, c3 = st.columns(3)
+                c1, c2 = st.columns(2)
                 with c1:
                     docx_f = create_docx_report(st.session_state["report_text"], sport)
                     st.download_button("📄 WORD DOC", docx_f, f"{sport}_ANALYSIS.docx", width="stretch")
                 with c2:
                     pdf_f = create_pdf_report(st.session_state["report_text"], sport)
                     st.download_button("📜 PDF REPORT", pdf_f, f"{sport}_ANALYSIS.pdf", width="stretch")
-                with c3:
-                    json_data = json.dumps(st.session_state["tele_opt"], indent=2)
-                    st.download_button("💾 RAW JSON", json_data, f"{sport}_TELEMETRY.json", "application/json", width="stretch")
 
         if st.button("↺ ANALYZE ANOTHER VIDEO", width="stretch"):
             for key in list(st.session_state.keys()): del st.session_state[key]
