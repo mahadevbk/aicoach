@@ -455,7 +455,7 @@ def create_pdf_report(text, sport_name, action, hand):
             if in_table and table_data:
                 pdf.set_font(f_main, '', 8)
                 # Use fpdf2 table feature for automatic wrapping
-                with pdf.table(borders_layout="GRID", gutter_height=1) as table:
+                with pdf.table(borders_layout="ALL", gutter_height=1) as table:
                     for r_idx, row_data in enumerate(table_data):
                         row = table.row()
                         for val in row_data:
