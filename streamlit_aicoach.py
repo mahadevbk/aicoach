@@ -713,7 +713,7 @@ ACTION_SIGNATURES = {
     }
 }
 
-def auto_detect_actions(metrics, sport):
+def auto_detect_actions(metrics, sport, fps=30):
     """Detects frame indices where key actions occur based on telemetry peaks with priority and validation."""
     detected = []
     sport = "".join([c for c in sport if ord(c) < 128]).strip().upper()
@@ -723,6 +723,9 @@ def auto_detect_actions(metrics, sport):
     first_metric = next(iter(metrics.values()), [])
     total_frames = len(first_metric)
     if total_frames < 3: return detected
+
+    # Suppression window: 8 seconds
+    suppression_window = int(fps * 8)
 
     i = 1
     while i < total_frames - 1:
@@ -773,7 +776,7 @@ def auto_detect_actions(metrics, sport):
             # Select action with the highest threshold (priority)
             best = max(candidates, key=lambda x: x['priority'])
             detected.append({"action": best['action'], "frame": int(best['frame'])})
-            i += 50 # Increased Temporal suppression: Skip next 50 frames (~1.6s @ 30fps)
+            i += suppression_window # Temporal suppression: 8 seconds skip
         else:
             i += 1
             
@@ -1427,51 +1430,57 @@ with tab2:
         action_upper = action.upper()
         
         if sport_clean == "TENNIS" and action_upper == "GENERAL RALLY":
-            st.markdown("#### 🤖 AUTO-DETECTED KEY MOTIONS (Beta feature)")
-            
-            # Need metrics for auto-detection
-            if "tele_opt_preview" not in st.session_state:
-                with st.spinner("SCANNING FOR MOTIONS..."):
-                    raw_interp = interpolate_landmarks(s['d1']['raw'])
-                    # Build a preview telemetry object to get metrics
-                    st.session_state["tele_opt_preview"] = build_pro_telemetry(raw_interp, sport, action, sl1, s['d1']['fps'], "lead")
-            
-            # Initialize session state for actions if not present
-            if "manual_actions" not in st.session_state:
-                st.session_state.manual_actions = auto_detect_actions(
-                    st.session_state["tele_opt_preview"]["metrics"], sport_clean
-                )
-
-            if st.session_state.manual_actions:
-                # Display editable frames for detected actions
-                num_actions = len(st.session_state.manual_actions)
+            with st.expander("🤖 AUTO-DETECTION SETTINGS (Beta)", expanded=True):
+                use_detection = st.toggle("Enable multi-motion detection", value=True, key="use_multi_detect")
                 
-                # Create a list to track indices to remove
-                to_remove = []
-                
-                for idx, act in enumerate(st.session_state.manual_actions):
-                    c1, c2 = st.columns([3, 1])
-                    with c1:
-                        new_frame = st.number_input(
-                            f"{act['action']}", 
-                            value=int(act['frame']), 
-                            step=1, 
-                            key=f"act_{idx}"
+                if use_detection:
+                    # Need metrics for auto-detection
+                    if "tele_opt_preview" not in st.session_state:
+                        with st.spinner("SCANNING FOR MOTIONS..."):
+                            raw_interp = interpolate_landmarks(s['d1']['raw'])
+                            # Build a preview telemetry object to get metrics
+                            st.session_state["tele_opt_preview"] = build_pro_telemetry(raw_interp, sport, action, sl1, s['d1']['fps'], "lead")
+                    
+                    # Initialize session state for actions if not present
+                    if "manual_actions" not in st.session_state:
+                        st.session_state.manual_actions = auto_detect_actions(
+                            st.session_state["tele_opt_preview"]["metrics"], sport_clean, fps=s['d1']['fps']
                         )
-                        st.session_state.manual_actions[idx]['frame'] = new_frame
-                    with c2:
-                        st.write("") # Spacer
-                        st.write("") # Spacer
-                        if st.button("🗑️", key=f"del_{idx}", help=f"Remove {act['action']}"):
-                            to_remove.append(idx)
-                
-                # Perform removals if any
-                if to_remove:
-                    for index in sorted(to_remove, reverse=True):
-                        st.session_state.manual_actions.pop(index)
-                    st.rerun()
-            else:
-                st.info("No specific shots auto-detected. You can continue with general analysis.")
+
+                    # Option to add a new manual action
+                    if st.button("➕ Add Manual Motion"):
+                        st.session_state.manual_actions.append({"action": "FOREHAND DRIVE", "frame": sl1})
+                        st.rerun()
+
+                    if st.session_state.manual_actions:
+                        # Create a list to track indices to remove
+                        to_remove = []
+                        
+                        for idx, act in enumerate(st.session_state.manual_actions):
+                            c1, c2, c3 = st.columns([2, 2, 1])
+                            with c1:
+                                # Allow editing the action type
+                                available_actions = list(ACTION_SIGNATURES["TENNIS"].keys())
+                                current_idx = 0
+                                if act['action'] in available_actions:
+                                    current_idx = available_actions.index(act['action'])
+                                
+                                act['action'] = st.selectbox(f"Type", available_actions, index=current_idx, key=f"type_{idx}", label_visibility="collapsed")
+                            with c2:
+                                act['frame'] = st.number_input(f"Frame", value=int(act['frame']), step=1, key=f"act_{idx}", label_visibility="collapsed")
+                            with c3:
+                                if st.button("🗑️", key=f"del_{idx}"):
+                                    to_remove.append(idx)
+                        
+                        # Perform removals if any
+                        if to_remove:
+                            for index in sorted(to_remove, reverse=True):
+                                st.session_state.manual_actions.pop(index)
+                            st.rerun()
+                    else:
+                        st.info("No specific shots auto-detected. Use 'Add Manual Motion' to define key frames.")
+                else:
+                    st.info("Multi-motion detection disabled. Analysis will focus on the single impact frame selected above.")
 
         if st.button("🚀 START FINAL BIOMECHANICAL RENDER", type="primary", width="stretch"):
             with st.spinner("PROCESSING VECTORS..."):
@@ -1485,8 +1494,8 @@ with tab2:
                 raw_interp = interpolate_landmarks(s['d1']['raw'])
                 tele_opt = build_pro_telemetry(raw_interp, sport, action, sl1, s['d1']['fps'], "dual" if s['p2'] else "lead", handedness_override=h_val)
                 
-                # --- INJECT DETECTED ACTIONS ---
-                if "manual_actions" in st.session_state:
+                # --- INJECT DETECTED ACTIONS (If enabled) ---
+                if st.session_state.get("use_multi_detect", False) and "manual_actions" in st.session_state:
                     tele_opt["metadata"]["detected_actions"] = st.session_state.manual_actions
                 
                 st.session_state["tele_opt"] = tele_opt
