@@ -392,6 +392,7 @@ class PDFReport(FPDF):
                     # Fallback to a similar font if local not found and download fails
                     urllib.request.urlretrieve("https://github.com/google/fonts/raw/main/ofl/robotoflex/RobotoFlex%5BGRAD%2CXOPQ%2CXTRA%2CYOPQ%2CYTLC%2CYTAS%2CYTDE%2CYTFI%2Copsz%2Cslnt%2Cwdth%2Cwght%5D.ttf", font_path)
             self.add_font("CustomFont", "", font_path)
+            self.add_font("CustomFont", "B", font_path) # Register same file for bold to prevent crashes
             self.custom_font_active = True
         except:
             self.custom_font_active = False
