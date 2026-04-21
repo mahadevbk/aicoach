@@ -303,8 +303,8 @@ def create_docx_report(text, sport_name, action, hand):
     header.alignment = WD_ALIGN_PARAGRAPH.CENTER
     if header.runs:
         header.runs[0].font.name = 'Bitcount Prop Single'
-        header.runs[0].bold = False
-        header.runs[0].font.size = Pt(8)
+        header.runs[0].bold = True
+        header.runs[0].font.size = Pt(10)
     
     subtitle = doc.add_paragraph("BIO MECHANICAL ANALYSIS REPORT")
     subtitle.alignment = WD_ALIGN_PARAGRAPH.CENTER
@@ -313,11 +313,20 @@ def create_docx_report(text, sport_name, action, hand):
         subtitle.runs[0].bold = True
         subtitle.runs[0].font.size = Pt(8)
     
-    p_sport = doc.add_paragraph(f"Sport: {sport_name}")
+    p_sport = doc.add_paragraph()
+    p_sport.add_run(f"Sport: ").bold = True
+    p_sport.add_run(sport_name)
     p_sport.style.font.size = Pt(8)
-    p_activity = doc.add_paragraph(f"Activity: {action}")
+    
+    p_activity = doc.add_paragraph()
+    p_activity.add_run(f"Activity: ").bold = True
+    p_activity.add_run(action)
     p_activity.style.font.size = Pt(8)
-    p_hand = doc.add_paragraph(f"Hand dominance: {hand} | Date: {time.strftime('%Y-%m-%d')}")
+    
+    p_hand = doc.add_paragraph()
+    p_hand.add_run(f"Hand dominance: ").bold = True
+    p_hand.add_run(hand)
+    p_hand.add_run(f" | Date: {time.strftime('%Y-%m-%d')}")
     p_hand.style.font.size = Pt(8)
     doc.add_paragraph("_" * 50)
 
@@ -346,6 +355,7 @@ def create_docx_report(text, sport_name, action, hand):
                             for paragraph in cell.paragraphs:
                                 for run in paragraph.runs:
                                     run.font.size = Pt(8)
+                                    if r_idx == 0: run.bold = True # Bold header row
                 doc.add_paragraph()
                 table_data = []
                 in_table = False
@@ -387,11 +397,11 @@ class PDFReport(FPDF):
         self.custom_font_active = False
         try:
             # Check local folder first (e.g. if uploaded to GitHub)
-            local_font = "BitcountPropSingle-Regular.ttf"
+            local_font = "BitcountPropSingle-VariableFont_CRSV,ELSH,ELXP,slnt,wght.ttf"
             if os.path.exists(local_font):
                 font_path = local_font
             else:
-                font_path = os.path.join(tempfile.gettempdir(), "BitcountPropSingle-Regular.ttf")
+                font_path = os.path.join(tempfile.gettempdir(), "BitcountPropSingle-VF.ttf")
                 if not os.path.exists(font_path):
                     # Fallback to a similar font if local not found and download fails
                     urllib.request.urlretrieve("https://github.com/google/fonts/raw/main/ofl/robotoflex/RobotoFlex%5BGRAD%2CXOPQ%2CXTRA%2CYOPQ%2CYTLC%2CYTAS%2CYTDE%2CYTFI%2Copsz%2Cslnt%2Cwdth%2Cwght%5D.ttf", font_path)
@@ -403,15 +413,15 @@ class PDFReport(FPDF):
 
     def header(self):
         f_name = "CustomFont" if self.custom_font_active else "helvetica"
-        self.set_font(f_name, '', 8)
+        self.set_font(f_name, 'B', 10) # Bold and size 10 for main title
         self.set_text_color(0, 180, 255)
-        self.cell(0, 8, 'VECTOR VICTOR AI', border=False, align='C', new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-        self.set_font(f_name, '', 8)
+        self.cell(0, 10, 'VECTOR VICTOR AI', border=False, align='C', new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        self.set_font(f_name, 'B', 8) # Bold for subtitle
         self.set_text_color(100, 100, 100)
         self.cell(0, 5, 'BIO MECHANICAL ANALYSIS REPORT', border=False, align='C', new_x=XPos.LMARGIN, new_y=YPos.NEXT)
         self.ln(2)
         self.set_draw_color(0, 180, 255)
-        self.line(10, 25, 200, 25)
+        self.line(10, 28, 200, 28)
         self.ln(5)
 
     def footer(self):
@@ -431,11 +441,20 @@ def create_pdf_report(text, sport_name, action, hand):
     pdf.alias_nb_pages()
     pdf.add_page()
     f_main = "CustomFont" if pdf.custom_font_active else "helvetica"
+    pdf.set_font(f_main, 'B', 8)
+    pdf.write(6, "Sport: ")
     pdf.set_font(f_main, '', 8)
-    pdf.set_text_color(0, 0, 0)
-    pdf.cell(0, 6, f"Sport: {clean_for_pdf(sport_name)}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-    pdf.cell(0, 6, f"Activity: {clean_for_pdf(action)}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-    pdf.cell(0, 6, f"Hand dominance: {clean_for_pdf(hand)} | Date: {time.strftime('%Y-%m-%d %H:%M:%S')}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+    pdf.write(6, f"{clean_for_pdf(sport_name)}\n")
+    
+    pdf.set_font(f_main, 'B', 8)
+    pdf.write(6, "Activity: ")
+    pdf.set_font(f_main, '', 8)
+    pdf.write(6, f"{clean_for_pdf(action)}\n")
+    
+    pdf.set_font(f_main, 'B', 8)
+    pdf.write(6, "Hand dominance: ")
+    pdf.set_font(f_main, '', 8)
+    pdf.write(6, f"{clean_for_pdf(hand)} | Date: {time.strftime('%Y-%m-%d %H:%M:%S')}\n")
     pdf.ln(4)
 
     lines = text.split('\n')
@@ -453,11 +472,14 @@ def create_pdf_report(text, sport_name, action, hand):
             continue
         else:
             if in_table and table_data:
-                pdf.set_font(f_main, '', 8)
                 # Use fpdf2 table feature for automatic wrapping
-                with pdf.table(borders_layout="ALL", gutter_height=1) as table:
+                with pdf.table(borders_layout="ALL", gutter_height=1, text_align="LEFT") as table:
                     for r_idx, row_data in enumerate(table_data):
                         row = table.row()
+                        if r_idx == 0:
+                            pdf.set_font(f_main, 'B', 8)
+                        else:
+                            pdf.set_font(f_main, '', 8)
                         for val in row_data:
                             row.cell(val)
                 pdf.ln(4)
