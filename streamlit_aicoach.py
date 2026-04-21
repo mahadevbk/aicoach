@@ -706,10 +706,10 @@ def detect_handedness(raw_frames):
 # Add this to Section 4: BIOMECHANIC CALCULATORS
 ACTION_SIGNATURES = {
     "TENNIS": {
-        "SERVE": {"metric": "r_wrist_speed", "threshold": 0.6, "min_elbow": 130},
-        "FOREHAND DRIVE": {"metric": "r_wrist_speed", "threshold": 0.35, "min_elbow": 80},
-        "BACKHAND DRIVE": {"metric": "l_wrist_speed", "threshold": 0.35, "min_elbow": 80},
-        "FOREHAND SLICE": {"metric": "r_wrist_speed", "threshold": 0.25, "max_elbow": 100},
+        "SERVE": {"metric": "r_wrist_speed", "threshold": 0.85, "min_elbow": 150, "min_shoulder": 110},
+        "FOREHAND DRIVE": {"metric": "r_wrist_speed", "threshold": 0.5, "min_elbow": 80, "max_shoulder": 100},
+        "BACKHAND DRIVE": {"metric": "l_wrist_speed", "threshold": 0.5, "min_elbow": 80},
+        "FOREHAND SLICE": {"metric": "r_wrist_speed", "threshold": 0.4, "max_elbow": 110},
     }
 }
 
@@ -741,19 +741,29 @@ def auto_detect_actions(metrics, sport):
             
             # Secondary verification
             passed_secondary = True
-            # Determine which elbow to check based on the wrist metric side
+            # Determine which side to check based on the wrist metric side
             side_prefix = "r" if "r_wrist" in sig['metric'] else "l"
-            elbow_key = f"{side_prefix}_elbow"
-            elbow_angles = metrics.get(elbow_key, [])
             
+            # Elbow Check
+            elbow_angles = metrics.get(f"{side_prefix}_elbow", [])
             if 'min_elbow' in sig:
                 if i < len(elbow_angles) and elbow_angles[i] is not None:
                     if elbow_angles[i] < sig['min_elbow']: passed_secondary = False
                 else: passed_secondary = False
-            
             if 'max_elbow' in sig:
                 if i < len(elbow_angles) and elbow_angles[i] is not None:
                     if elbow_angles[i] > sig['max_elbow']: passed_secondary = False
+                else: passed_secondary = False
+            
+            # Shoulder Check (Abduction)
+            shoulder_angles = metrics.get(f"{side_prefix}_shoulder_abduction", [])
+            if 'min_shoulder' in sig:
+                if i < len(shoulder_angles) and shoulder_angles[i] is not None:
+                    if shoulder_angles[i] < sig['min_shoulder']: passed_secondary = False
+                else: passed_secondary = False
+            if 'max_shoulder' in sig:
+                if i < len(shoulder_angles) and shoulder_angles[i] is not None:
+                    if shoulder_angles[i] > sig['max_shoulder']: passed_secondary = False
                 else: passed_secondary = False
                 
             if passed_secondary:
@@ -763,7 +773,7 @@ def auto_detect_actions(metrics, sport):
             # Select action with the highest threshold (priority)
             best = max(candidates, key=lambda x: x['priority'])
             detected.append({"action": best['action'], "frame": int(best['frame'])})
-            i += 25 # Temporal suppression: Skip next 25 frames
+            i += 50 # Increased Temporal suppression: Skip next 50 frames (~1.6s @ 30fps)
         else:
             i += 1
             
