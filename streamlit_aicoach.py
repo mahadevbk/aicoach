@@ -706,35 +706,68 @@ def detect_handedness(raw_frames):
 # Add this to Section 4: BIOMECHANIC CALCULATORS
 ACTION_SIGNATURES = {
     "TENNIS": {
-        "SERVE": {"metric": "r_wrist_speed", "threshold": 0.8, "min_elbow": 140},
-        "FOREHAND DRIVE": {"metric": "r_wrist_speed", "threshold": 0.5, "plane": "coronal"},
-        "BACKHAND DRIVE": {"metric": "l_wrist_speed", "threshold": 0.5},
-        "FOREHAND SLICE": {"metric": "r_wrist_speed", "threshold": 0.3, "lean": "forward"},
-    },
-    # Add other sports as needed
+        "SERVE": {"metric": "r_wrist_speed", "threshold": 0.6, "min_elbow": 130},
+        "FOREHAND DRIVE": {"metric": "r_wrist_speed", "threshold": 0.35, "min_elbow": 80},
+        "BACKHAND DRIVE": {"metric": "l_wrist_speed", "threshold": 0.35, "min_elbow": 80},
+        "FOREHAND SLICE": {"metric": "r_wrist_speed", "threshold": 0.25, "max_elbow": 100},
+    }
 }
 
 def auto_detect_actions(metrics, sport):
-    """Detects frame indices where key actions occur based on telemetry peaks."""
+    """Detects frame indices where key actions occur based on telemetry peaks with priority and validation."""
     detected = []
-    # Clean sport name just in case
     sport = "".join([c for c in sport if ord(c) < 128]).strip().upper()
     if sport not in ACTION_SIGNATURES: return detected
     
-    # Example logic: Find peaks in wrist speed that match sport signatures
-    for action_name, sig in ACTION_SIGNATURES[sport].items():
-        speeds = metrics.get(sig['metric'], [])
-        # Find local maxima above threshold
-        for i in range(1, len(speeds)-1):
-            if speeds[i] and speeds[i] > sig['threshold']:
-                # Basic peak detection
-                prev_val = speeds[i-1] if speeds[i-1] is not None else 0
-                next_val = speeds[i+1] if speeds[i+1] is not None else 0
-                if speeds[i] > prev_val and speeds[i] > next_val:
-                    detected.append({"action": action_name, "frame": i})
-    
-    # Deduplicate and sort by frame
-    return sorted(detected, key=lambda x: x['frame'])
+    # Get total frames from any available metric
+    first_metric = next(iter(metrics.values()), [])
+    total_frames = len(first_metric)
+    if total_frames < 3: return detected
+
+    i = 1
+    while i < total_frames - 1:
+        candidates = []
+        for action_name, sig in ACTION_SIGNATURES[sport].items():
+            speeds = metrics.get(sig['metric'], [])
+            if i >= len(speeds): continue
+            
+            val = speeds[i]
+            if val is None or val <= sig['threshold']: continue
+            
+            # Local peak check (robust against None)
+            prev_val = speeds[i-1] if (i > 0 and speeds[i-1] is not None) else 0
+            next_val = speeds[i+1] if (i < total_frames-1 and speeds[i+1] is not None) else 0
+            if not (val > prev_val and val > next_val): continue
+            
+            # Secondary verification
+            passed_secondary = True
+            # Determine which elbow to check based on the wrist metric side
+            side_prefix = "r" if "r_wrist" in sig['metric'] else "l"
+            elbow_key = f"{side_prefix}_elbow"
+            elbow_angles = metrics.get(elbow_key, [])
+            
+            if 'min_elbow' in sig:
+                if i < len(elbow_angles) and elbow_angles[i] is not None:
+                    if elbow_angles[i] < sig['min_elbow']: passed_secondary = False
+                else: passed_secondary = False
+            
+            if 'max_elbow' in sig:
+                if i < len(elbow_angles) and elbow_angles[i] is not None:
+                    if elbow_angles[i] > sig['max_elbow']: passed_secondary = False
+                else: passed_secondary = False
+                
+            if passed_secondary:
+                candidates.append({"action": action_name, "frame": i, "priority": sig['threshold']})
+        
+        if candidates:
+            # Select action with the highest threshold (priority)
+            best = max(candidates, key=lambda x: x['priority'])
+            detected.append({"action": best['action'], "frame": int(best['frame'])})
+            i += 25 # Temporal suppression: Skip next 25 frames
+        else:
+            i += 1
+            
+    return detected
 
 def build_pro_telemetry(raw_frames, sport_raw, action, event_frame, fps, camera_mode, handedness_override=None):
     total_frames = len(raw_frames)
