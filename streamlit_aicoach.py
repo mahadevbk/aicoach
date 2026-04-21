@@ -1254,6 +1254,7 @@ with tab2:
                 
                 raw_interp = interpolate_landmarks(s['d1']['raw'])
                 tele_opt = build_pro_telemetry(raw_interp, sport, action, sl1, s['d1']['fps'], "dual" if s['p2'] else "lead", handedness_override=h_val)
+                st.session_state["tele_opt"] = tele_opt
                 #st.session_state["brief"] = generate_brief(tele_opt)
                 st.session_state["brief"] = generate_brief.generate_brief(
 					tele_opt,
@@ -1319,13 +1320,16 @@ with tab3:
             if "report_text" in st.session_state:
                 st.markdown(st.session_state["report_text"])
                 st.markdown("#### EXPORT DOCUMENTS")
-                c1, c2 = st.columns(2)
+                c1, c2, c3 = st.columns(3)
                 with c1:
                     docx_f = create_docx_report(st.session_state["report_text"], sport)
                     st.download_button("📄 WORD DOC", docx_f, f"{sport}_ANALYSIS.docx", width="stretch")
                 with c2:
                     pdf_f = create_pdf_report(st.session_state["report_text"], sport)
                     st.download_button("📜 PDF REPORT", pdf_f, f"{sport}_ANALYSIS.pdf", width="stretch")
+                with c3:
+                    json_data = json.dumps(st.session_state["tele_opt"], indent=2)
+                    st.download_button("💾 RAW JSON", json_data, f"{sport}_TELEMETRY.json", "application/json", width="stretch")
 
         if st.button("↺ ANALYZE ANOTHER VIDEO", width="stretch"):
             for key in list(st.session_state.keys()): del st.session_state[key]
