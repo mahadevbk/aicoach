@@ -296,38 +296,35 @@ def generate_pro_report(brief_content, sport="GENERAL", action="MOVEMENT"):
 def create_docx_report(text, sport_name, action, hand):
     doc = Document()
     style = doc.styles['Normal']
-    style.font.name = 'Bitcount Prop Single'
+    style.font.name = 'Arial' # Professional universal sans-serif
     style.font.size = Pt(8)
     
-    header = doc.add_heading("VECTOR VICTOR AI", 0)
+    header = doc.add_heading("", 0)
     header.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    if header.runs:
-        header.runs[0].font.name = 'Bitcount Prop Single'
-        header.runs[0].bold = True
-        header.runs[0].font.size = Pt(10)
+    run = header.add_run("VECTOR VICTOR AI")
+    run.font.name = 'Bitcount Prop Single'
+    run.bold = True
+    run.font.size = Pt(10)
     
-    subtitle = doc.add_paragraph("BIO MECHANICAL ANALYSIS REPORT")
+    subtitle = doc.add_paragraph()
     subtitle.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    if subtitle.runs:
-        subtitle.runs[0].font.name = 'Bitcount Prop Single'
-        subtitle.runs[0].bold = True
-        subtitle.runs[0].font.size = Pt(8)
+    s_run = subtitle.add_run("BIO MECHANICAL ANALYSIS REPORT")
+    s_run.font.name = 'Bitcount Prop Single'
+    s_run.bold = True
+    s_run.font.size = Pt(8)
     
     p_sport = doc.add_paragraph()
-    p_sport.add_run(f"Sport: ").bold = True
+    p_sport.add_run("Sport: ").bold = True
     p_sport.add_run(sport_name)
-    p_sport.style.font.size = Pt(8)
     
     p_activity = doc.add_paragraph()
-    p_activity.add_run(f"Activity: ").bold = True
+    p_activity.add_run("Activity: ").bold = True
     p_activity.add_run(action)
-    p_activity.style.font.size = Pt(8)
     
     p_hand = doc.add_paragraph()
-    p_hand.add_run(f"Hand dominance: ").bold = True
+    p_hand.add_run("Hand dominance: ").bold = True
     p_hand.add_run(hand)
     p_hand.add_run(f" | Date: {time.strftime('%Y-%m-%d')}")
-    p_hand.style.font.size = Pt(8)
     doc.add_paragraph("_" * 50)
 
     lines = text.split('\n')
@@ -440,7 +437,9 @@ def create_pdf_report(text, sport_name, action, hand):
     pdf = PDFReport()
     pdf.alias_nb_pages()
     pdf.add_page()
-    f_main = "CustomFont" if pdf.custom_font_active else "helvetica"
+    # Body font is Helvetica (universally available sans-serif)
+    f_main = "helvetica"
+    
     pdf.set_font(f_main, 'B', 8)
     pdf.write(6, "Sport: ")
     pdf.set_font(f_main, '', 8)
