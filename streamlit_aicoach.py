@@ -1427,7 +1427,7 @@ with tab2:
         action_upper = action.upper()
         
         if sport_clean == "TENNIS" and action_upper == "GENERAL RALLY":
-            st.markdown("#### 🤖 AUTO-DETECTED KEY MOTIONS")
+            st.markdown("#### 🤖 AUTO-DETECTED KEY MOTIONS (Beta feature)")
             
             # Need metrics for auto-detection
             if "tele_opt_preview" not in st.session_state:
@@ -1444,11 +1444,14 @@ with tab2:
 
             if st.session_state.manual_actions:
                 # Display editable frames for detected actions
-                # Use fewer columns if many actions detected
                 num_actions = len(st.session_state.manual_actions)
-                cols = st.columns(min(num_actions, 4))
+                
+                # Create a list to track indices to remove
+                to_remove = []
+                
                 for idx, act in enumerate(st.session_state.manual_actions):
-                    with cols[idx % min(num_actions, 4)]:
+                    c1, c2 = st.columns([3, 1])
+                    with c1:
                         new_frame = st.number_input(
                             f"{act['action']}", 
                             value=int(act['frame']), 
@@ -1456,6 +1459,17 @@ with tab2:
                             key=f"act_{idx}"
                         )
                         st.session_state.manual_actions[idx]['frame'] = new_frame
+                    with c2:
+                        st.write("") # Spacer
+                        st.write("") # Spacer
+                        if st.button("🗑️", key=f"del_{idx}", help=f"Remove {act['action']}"):
+                            to_remove.append(idx)
+                
+                # Perform removals if any
+                if to_remove:
+                    for index in sorted(to_remove, reverse=True):
+                        st.session_state.manual_actions.pop(index)
+                    st.rerun()
             else:
                 st.info("No specific shots auto-detected. You can continue with general analysis.")
 
