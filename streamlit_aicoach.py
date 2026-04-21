@@ -1158,6 +1158,13 @@ if "GEMINI_API_KEY" in st.secrets:
 import plotly.graph_objects as go
 import plotly.express as px
 
+class NpEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, (np.integer, np.int64)): return int(obj)
+        if isinstance(obj, (np.floating, np.float32, np.float64)): return float(obj)
+        if isinstance(obj, np.ndarray): return obj.tolist()
+        return super(NpEncoder, self).default(obj)
+
 # Tabs Navigation
 tab1, tab2, tab3 = st.tabs(["UPLOAD", "ANALYZE", "RESULTS"])
 
@@ -1308,7 +1315,7 @@ with tab3:
             with cz1:
                 st.download_button("📥 DOWNLOAD ZIP (VIDEO + DATA)", z_buf.getvalue(), f"{sport}_DATA.zip", width="stretch")
             with cz2:
-                json_data = json.dumps(st.session_state["tele_opt"], indent=2)
+                json_data = json.dumps(st.session_state["tele_opt"], indent=2, cls=NpEncoder)
                 st.download_button("💾 RAW JSON", json_data, f"{sport}_TELEMETRY.json", "application/json", width="stretch")
             
             st.markdown("---")
