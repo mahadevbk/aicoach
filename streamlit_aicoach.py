@@ -207,33 +207,34 @@ SPORT & ACTION CONTEXT:
 - Injury prevention focus: {', '.join(context['injury_risks'])}
 
 MANDATORY REPORT STRUCTURE:
-1. Executive Summary (2-3 sentences on overall {action.lower()} quality)
-2. Performance Scores table: 
+1. Executive Summary (2-3 sentences on overall {action.lower()} quality). Mention dominant side here.
+2. Specialist coach's analysis, strengths and weaknesses.
+3. Performance Scores table: 
    - Category | Score/100 | vs Benchmark | Assessment
    - Include scores for: Technique, Timing, Power, Balance/Stability, Follow-Through, Kinetic Chain, Consistency
-3. Key Measurements table: 
+4. Key Measurements table: 
    - Metric | Value | Benchmark | Status (Good/Attention/Issue)
    - Compare all provided measurements to benchmarks
 4. Movement Progression Analysis:
    - Describe the movement from START → MID-POINT → FINISH
    - Identify timing of key events
    - Assess smoothness and efficiency
-5. Kinetic Chain Assessment:
+6. Kinetic Chain Assessment:
    - Analyze sequential energy transfer through: {context['primary_chain']}
    - Identify any breaks or delays in the chain
    - Assess efficiency of each segment
-6. Critical Technical Issues (max 3):
+7. Critical Technical Issues (max 3):
    - Issue | Impact | Severity (HIGH/MEDIUM/LOW)
    - Explain the specific biomechanical problem
    - Note if it affects performance vs safety
-7. Coaching Recommendations (max 5):
+8. Coaching Recommendations (max 5):
    - Recommendation | Priority (HIGH/MEDIUM/LOW) | Specific Cue | Progressive Drill
    - Focus on: {', '.join(context['common_issues'])}
-8. Injury Risk Assessment:
+9. Injury Risk Assessment:
    - Identify any movement patterns suggesting injury risk
    - Areas of concern: {', '.join(context['injury_risks'])}
    - Recommendations for prevention
-9. Summary:
+10. Summary:
    - One sentence on current level
    - Next 3 priorities for improvement
    - Estimated timeline to see improvement
