@@ -313,6 +313,10 @@ def create_docx_report(text, sport_name, action, hand):
     s_run.bold = True
     s_run.font.size = Pt(8)
     
+    p_date = doc.add_paragraph()
+    p_date.add_run("Date: ").bold = True
+    p_date.add_run(time.strftime('%Y-%m-%d'))
+
     p_sport = doc.add_paragraph()
     p_sport.add_run("Sport: ").bold = True
     p_sport.add_run(sport_name)
@@ -324,7 +328,6 @@ def create_docx_report(text, sport_name, action, hand):
     p_hand = doc.add_paragraph()
     p_hand.add_run("Hand dominance: ").bold = True
     p_hand.add_run(hand)
-    p_hand.add_run(f" | Date: {time.strftime('%Y-%m-%d')}")
     doc.add_paragraph("_" * 50)
 
     lines = text.split('\n')
@@ -368,9 +371,19 @@ def create_docx_report(text, sport_name, action, hand):
             h = doc.add_heading(clean_line.replace('### ', ''), level=2)
             if h.runs: h.runs[0].font.size = Pt(8)
         elif clean_line.startswith('* ') or clean_line.startswith('- '):
-            p = doc.add_paragraph(clean_line[2:], style='List Bullet')
+            p = doc.add_paragraph(style='List Bullet')
             p.paragraph_format.space_after = Pt(4)
-            for run in p.runs: run.font.size = Pt(8)
+            content = clean_line[2:]
+            if ':' in content:
+                title, desc = content.split(':', 1)
+                run_t = p.add_run(title + ":")
+                run_t.bold = True
+                run_t.font.size = Pt(8)
+                run_d = p.add_run(desc)
+                run_d.font.size = Pt(8)
+            else:
+                run = p.add_run(content)
+                run.font.size = Pt(8)
         else:
             p = doc.add_paragraph()
             p.paragraph_format.space_after = Pt(6)
@@ -423,7 +436,7 @@ class PDFReport(FPDF):
 
     def footer(self):
         self.set_y(-15)
-        self.set_font('helvetica', 'I', 8)
+        self.set_font('helvetica', '', 8)
         self.set_text_color(128, 128, 128)
         self.cell(0, 10, f'Page {self.page_no()}/{{nb}} | Vector Victor Biomechanics Engine', align='C')
 
@@ -441,6 +454,11 @@ def create_pdf_report(text, sport_name, action, hand):
     f_main = "helvetica"
     
     pdf.set_font(f_main, 'B', 8)
+    pdf.write(6, "Date: ")
+    pdf.set_font(f_main, '', 8)
+    pdf.write(6, f"{time.strftime('%Y-%m-%d %H:%M:%S')}\n")
+
+    pdf.set_font(f_main, 'B', 8)
     pdf.write(6, "Sport: ")
     pdf.set_font(f_main, '', 8)
     pdf.write(6, f"{clean_for_pdf(sport_name)}\n")
@@ -453,7 +471,7 @@ def create_pdf_report(text, sport_name, action, hand):
     pdf.set_font(f_main, 'B', 8)
     pdf.write(6, "Hand dominance: ")
     pdf.set_font(f_main, '', 8)
-    pdf.write(6, f"{clean_for_pdf(hand)} | Date: {time.strftime('%Y-%m-%d %H:%M:%S')}\n")
+    pdf.write(6, f"{clean_for_pdf(hand)}\n")
     pdf.ln(4)
 
     lines = text.split('\n')
@@ -495,13 +513,22 @@ def create_pdf_report(text, sport_name, action, hand):
             pdf.set_text_color(80, 80, 80)
             pdf.multi_cell(0, 6, clean_line.replace('### ', ''), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
         elif clean_line.startswith('## '):
-            pdf.set_font(f_main, '', 8)
+            pdf.set_font(f_main, 'B', 8) # Explicitly bold
             pdf.set_text_color(0, 0, 0)
             pdf.multi_cell(0, 6, clean_line.replace('## ', ''), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
         elif clean_line.startswith('* ') or clean_line.startswith('- '):
-            pdf.set_font(f_main, '', 8)
             pdf.set_text_color(0, 0, 0)
-            pdf.multi_cell(0, 5, f"  - {clean_line[2:]}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+            content = clean_line[2:]
+            pdf.write(5, "  - ")
+            if ':' in content:
+                title, desc = content.split(':', 1)
+                pdf.set_font(f_main, 'B', 8)
+                pdf.write(5, title + ":")
+                pdf.set_font(f_main, '', 8)
+                pdf.write(5, desc + "\n")
+            else:
+                pdf.set_font(f_main, '', 8)
+                pdf.write(5, content + "\n")
         else:
             pdf.set_font(f_main, '', 8)
             pdf.set_text_color(30, 30, 30)
