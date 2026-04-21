@@ -293,7 +293,7 @@ def generate_pro_report(brief_content, sport="GENERAL", action="MOVEMENT"):
  
 
 
-def create_docx_report(text, sport_name):
+def create_docx_report(text, sport_name, action, hand):
     doc = Document()
     style = doc.styles['Normal']
     style.font.name = 'Bitcount Prop Single'
@@ -313,8 +313,12 @@ def create_docx_report(text, sport_name):
         subtitle.runs[0].bold = True
         subtitle.runs[0].font.size = Pt(8)
     
-    p_info = doc.add_paragraph(f"Sport: {sport_name} | Date: {time.strftime('%Y-%m-%d')}")
-    p_info.style.font.size = Pt(8)
+    p_sport = doc.add_paragraph(f"Sport: {sport_name}")
+    p_sport.style.font.size = Pt(8)
+    p_activity = doc.add_paragraph(f"Activity: {action}")
+    p_activity.style.font.size = Pt(8)
+    p_hand = doc.add_paragraph(f"Hand dominance: {hand} | Date: {time.strftime('%Y-%m-%d')}")
+    p_hand.style.font.size = Pt(8)
     doc.add_paragraph("_" * 50)
 
     lines = text.split('\n')
@@ -416,7 +420,7 @@ class PDFReport(FPDF):
         self.set_text_color(128, 128, 128)
         self.cell(0, 10, f'Page {self.page_no()}/{{nb}} | Vector Victor Biomechanics Engine', align='C')
 
-def create_pdf_report(text, sport_name):
+def create_pdf_report(text, sport_name, action, hand):
     def clean_for_pdf(s):
         try:
             return s.encode('latin-1', 'replace').decode('latin-1').replace('?', '')
@@ -430,8 +434,8 @@ def create_pdf_report(text, sport_name):
     pdf.set_font(f_main, '', 8)
     pdf.set_text_color(0, 0, 0)
     pdf.cell(0, 6, f"Sport: {clean_for_pdf(sport_name)}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-    pdf.set_font(f_main, '', 8)
-    pdf.cell(0, 5, f"Date: {time.strftime('%Y-%m-%d %H:%M:%S')}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+    pdf.cell(0, 6, f"Activity: {clean_for_pdf(action)}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+    pdf.cell(0, 6, f"Hand dominance: {clean_for_pdf(hand)} | Date: {time.strftime('%Y-%m-%d %H:%M:%S')}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
     pdf.ln(4)
 
     lines = text.split('\n')
@@ -450,11 +454,12 @@ def create_pdf_report(text, sport_name):
         else:
             if in_table and table_data:
                 pdf.set_font(f_main, '', 8)
-                col_width = (pdf.w - 20) / len(table_data[0])
-                for r_idx, row in enumerate(table_data):
-                    for val in row:
-                        pdf.cell(col_width, 6, val, border=1)
-                    pdf.ln(6)
+                # Use fpdf2 table feature for automatic wrapping
+                with pdf.table(borders_layout="GRID", gutter_height=1) as table:
+                    for r_idx, row_data in enumerate(table_data):
+                        row = table.row()
+                        for val in row_data:
+                            row.cell(val)
                 pdf.ln(4)
                 table_data = []
                 in_table = False
@@ -1356,11 +1361,15 @@ with tab3:
                 st.markdown(st.session_state["report_text"])
                 st.markdown("#### EXPORT DOCUMENTS")
                 c1, c2 = st.columns(2)
+                
+                # Get hand dominance
+                hand = st.session_state["tele_opt"]["metadata"].get("dominant_side", "unknown")
+                
                 with c1:
-                    docx_f = create_docx_report(st.session_state["report_text"], sport)
+                    docx_f = create_docx_report(st.session_state["report_text"], sport, action, hand)
                     st.download_button("📄 WORD DOC", docx_f, f"{sport}_ANALYSIS.docx", width="stretch")
                 with c2:
-                    pdf_f = create_pdf_report(st.session_state["report_text"], sport)
+                    pdf_f = create_pdf_report(st.session_state["report_text"], sport, action, hand)
                     st.download_button("📜 PDF REPORT", pdf_f, f"{sport}_ANALYSIS.pdf", width="stretch")
 
         if st.button("↺ ANALYZE ANOTHER VIDEO", width="stretch"):
