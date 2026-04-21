@@ -994,17 +994,30 @@ def analyze_vid(path, model):
             prev_w = w
     cap.release(); return {"history": history, "raw": raw, "fps": fps, "total": len(history), "impact": impact_f}
 
-def draw_neon_skeleton(img, lms, alpha=0.15):
+def draw_neon_skeleton(img, lms, alpha=0.6):
     if not lms: return
+    h, w, _ = img.shape
+    # Calculate dynamic thickness (approx 0.5% to 0.8% of video height)
+    thick = max(2, int(h * 0.005))
+    radius = max(3, int(h * 0.007))
+    neon_green = (0, 255, 204) # BGR for #ccff00
+
     overlay = img.copy()
     FULL_SKELETON = [(0,1), (1,2), (2,3), (3,7), (0,4), (4,5), (5,6), (6,8), (9,10), (11,12), (11,13), (13,15), (12,14), (14,16), (11,23), (12,24), (23,24), (23,25), (25,27), (24,26), (26,28)]
+    
+    # Draw connections
     for s, e in FULL_SKELETON:
-        p1 = (int(lms[s].x*img.shape[1]), int(lms[s].y*img.shape[0]))
-        p2 = (int(lms[e].x*img.shape[1]), int(lms[e].y*img.shape[0]))
-        cv2.line(overlay, p1, p2, (128, 128, 128), 2, cv2.LINE_AA)
+        if s < len(lms) and e < len(lms):
+            p1 = (int(lms[s].x * w), int(lms[s].y * h))
+            p2 = (int(lms[e].x * w), int(lms[e].y * h))
+            cv2.line(overlay, p1, p2, neon_green, thick, cv2.LINE_AA)
+            
+    # Draw joints with a small glow effect
     for i in range(len(lms)):
-        pt = (int(lms[i].x*img.shape[1]), int(lms[i].y*img.shape[0]))
-        cv2.circle(overlay, pt, 4, (0, 0, 255), -1, cv2.LINE_AA)
+        pt = (int(lms[i].x * w), int(lms[i].y * h))
+        cv2.circle(overlay, pt, radius, (255, 255, 255), -1, cv2.LINE_AA)
+        cv2.circle(overlay, pt, radius + 1, neon_green, 1, cv2.LINE_AA)
+        
     cv2.addWeighted(overlay, alpha, img, 1 - alpha, 0, img)
 
 def render_pro_stereo(p1, p2, h1, h2, f1, f2, fps):
