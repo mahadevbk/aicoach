@@ -297,23 +297,24 @@ def create_docx_report(text, sport_name):
     doc = Document()
     style = doc.styles['Normal']
     style.font.name = 'Bitcount Prop Single'
-    style.font.size = Pt(11)
+    style.font.size = Pt(8)
     
     header = doc.add_heading("VECTOR VICTOR AI", 0)
     header.alignment = WD_ALIGN_PARAGRAPH.CENTER
     if header.runs:
         header.runs[0].font.name = 'Bitcount Prop Single'
         header.runs[0].bold = False
-        header.runs[0].font.size = Pt(26)
+        header.runs[0].font.size = Pt(8)
     
     subtitle = doc.add_paragraph("BIO MECHANICAL ANALYSIS REPORT")
     subtitle.alignment = WD_ALIGN_PARAGRAPH.CENTER
     if subtitle.runs:
         subtitle.runs[0].font.name = 'Bitcount Prop Single'
         subtitle.runs[0].bold = True
-        subtitle.runs[0].font.size = Pt(14)
+        subtitle.runs[0].font.size = Pt(8)
     
-    doc.add_paragraph(f"Sport: {sport_name} | Date: {time.strftime('%Y-%m-%d')}")
+    p_info = doc.add_paragraph(f"Sport: {sport_name} | Date: {time.strftime('%Y-%m-%d')}")
+    p_info.style.font.size = Pt(8)
     doc.add_paragraph("_" * 50)
 
     lines = text.split('\n')
@@ -336,28 +337,41 @@ def create_docx_report(text, sport_name):
                 for r_idx, row in enumerate(table_data):
                     for c_idx, val in enumerate(row):
                         if c_idx < len(doc_table.columns):
-                            doc_table.cell(r_idx, c_idx).text = val
+                            cell = doc_table.cell(r_idx, c_idx)
+                            cell.text = val
+                            for paragraph in cell.paragraphs:
+                                for run in paragraph.runs:
+                                    run.font.size = Pt(8)
                 doc.add_paragraph()
                 table_data = []
                 in_table = False
 
         if not clean_line: continue
-        if clean_line.startswith('# '): doc.add_heading(clean_line.replace('# ', ''), level=0)
-        elif clean_line.startswith('## '): doc.add_heading(clean_line.replace('## ', ''), level=1)
-        elif clean_line.startswith('### '): doc.add_heading(clean_line.replace('### ', ''), level=2)
+        if clean_line.startswith('# '): 
+            h = doc.add_heading(clean_line.replace('# ', ''), level=0)
+            if h.runs: h.runs[0].font.size = Pt(8)
+        elif clean_line.startswith('## '): 
+            h = doc.add_heading(clean_line.replace('## ', ''), level=1)
+            if h.runs: h.runs[0].font.size = Pt(8)
+        elif clean_line.startswith('### '):
+            h = doc.add_heading(clean_line.replace('### ', ''), level=2)
+            if h.runs: h.runs[0].font.size = Pt(8)
         elif clean_line.startswith('* ') or clean_line.startswith('- '):
             p = doc.add_paragraph(clean_line[2:], style='List Bullet')
-            p.paragraph_format.space_after = Pt(6)
+            p.paragraph_format.space_after = Pt(4)
+            for run in p.runs: run.font.size = Pt(8)
         else:
             p = doc.add_paragraph()
-            p.paragraph_format.space_after = Pt(10)
+            p.paragraph_format.space_after = Pt(6)
             if '**' in clean_line:
                 parts = clean_line.split('**')
                 for i, part in enumerate(parts):
                     run = p.add_run(part)
+                    run.font.size = Pt(8)
                     if i % 2 == 1: run.bold = True
             else:
-                p.add_run(clean_line)
+                run = p.add_run(clean_line)
+                run.font.size = Pt(8)
                 
     bio = io.BytesIO()
     doc.save(bio)
@@ -368,9 +382,15 @@ class PDFReport(FPDF):
         super().__init__(format='A4')
         self.custom_font_active = False
         try:
-            font_path = os.path.join(tempfile.gettempdir(), "BitcountPropSingle-Medium.ttf")
-            if not os.path.exists(font_path):
-                urllib.request.urlretrieve("https://github.com/google/fonts/raw/main/ofl/robotoflex/RobotoFlex%5BGRAD%2CXOPQ%2CXTRA%2CYOPQ%2CYTLC%2CYTAS%2CYTDE%2CYTFI%2Copsz%2Cslnt%2Cwdth%2Cwght%5D.ttf", font_path)
+            # Check local folder first (e.g. if uploaded to GitHub)
+            local_font = "BitcountPropSingle-Regular.ttf"
+            if os.path.exists(local_font):
+                font_path = local_font
+            else:
+                font_path = os.path.join(tempfile.gettempdir(), "BitcountPropSingle-Regular.ttf")
+                if not os.path.exists(font_path):
+                    # Fallback to a similar font if local not found and download fails
+                    urllib.request.urlretrieve("https://github.com/google/fonts/raw/main/ofl/robotoflex/RobotoFlex%5BGRAD%2CXOPQ%2CXTRA%2CYOPQ%2CYTLC%2CYTAS%2CYTDE%2CYTFI%2Copsz%2Cslnt%2Cwdth%2Cwght%5D.ttf", font_path)
             self.add_font("CustomFont", "", font_path)
             self.custom_font_active = True
         except:
@@ -378,16 +398,16 @@ class PDFReport(FPDF):
 
     def header(self):
         f_name = "CustomFont" if self.custom_font_active else "helvetica"
-        self.set_font(f_name, '', 22)
+        self.set_font(f_name, '', 8)
         self.set_text_color(0, 180, 255)
-        self.cell(0, 15, 'VECTOR VICTOR AI', border=False, align='C', new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-        self.set_font(f_name, '', 12)
+        self.cell(0, 8, 'VECTOR VICTOR AI', border=False, align='C', new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        self.set_font(f_name, '', 8)
         self.set_text_color(100, 100, 100)
         self.cell(0, 5, 'BIO MECHANICAL ANALYSIS REPORT', border=False, align='C', new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-        self.ln(5)
+        self.ln(2)
         self.set_draw_color(0, 180, 255)
-        self.line(10, 35, 200, 35)
-        self.ln(10)
+        self.line(10, 25, 200, 25)
+        self.ln(5)
 
     def footer(self):
         self.set_y(-15)
@@ -406,12 +426,12 @@ def create_pdf_report(text, sport_name):
     pdf.alias_nb_pages()
     pdf.add_page()
     f_main = "CustomFont" if pdf.custom_font_active else "helvetica"
-    pdf.set_font(f_main, '', 12)
+    pdf.set_font(f_main, '', 8)
     pdf.set_text_color(0, 0, 0)
-    pdf.cell(0, 8, f"Sport: {clean_for_pdf(sport_name)}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-    pdf.set_font(f_main, '', 10)
+    pdf.cell(0, 6, f"Sport: {clean_for_pdf(sport_name)}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+    pdf.set_font(f_main, '', 8)
     pdf.cell(0, 5, f"Date: {time.strftime('%Y-%m-%d %H:%M:%S')}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-    pdf.ln(5)
+    pdf.ln(4)
 
     lines = text.split('\n')
     table_data = []
@@ -428,46 +448,46 @@ def create_pdf_report(text, sport_name):
             continue
         else:
             if in_table and table_data:
-                pdf.set_font(f_main, '', 9)
+                pdf.set_font(f_main, '', 8)
                 col_width = (pdf.w - 20) / len(table_data[0])
                 for r_idx, row in enumerate(table_data):
                     for val in row:
-                        pdf.cell(col_width, 8, val, border=1)
-                    pdf.ln(8)
-                pdf.ln(5)
+                        pdf.cell(col_width, 6, val, border=1)
+                    pdf.ln(6)
+                pdf.ln(4)
                 table_data = []
                 in_table = False
 
         if not clean_line:
-            pdf.ln(2)
+            pdf.ln(1)
             continue
 
         pdf.set_x(10)
+        pdf.set_font(f_main, '', 8)
         if clean_line.startswith('### '):
-            pdf.set_font(f_main, '', 12)
             pdf.set_text_color(80, 80, 80)
-            pdf.multi_cell(0, 8, clean_line.replace('### ', ''), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+            pdf.multi_cell(0, 6, clean_line.replace('### ', ''), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
         elif clean_line.startswith('## '):
-            pdf.set_font(f_main, '', 14)
+            pdf.set_font(f_main, '', 8)
             pdf.set_text_color(0, 0, 0)
-            pdf.multi_cell(0, 10, clean_line.replace('## ', ''), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+            pdf.multi_cell(0, 6, clean_line.replace('## ', ''), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
         elif clean_line.startswith('* ') or clean_line.startswith('- '):
-            pdf.set_font(f_main, '', 10)
+            pdf.set_font(f_main, '', 8)
             pdf.set_text_color(0, 0, 0)
-            pdf.multi_cell(0, 6, f"  - {clean_line[2:]}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+            pdf.multi_cell(0, 5, f"  - {clean_line[2:]}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
         else:
-            pdf.set_font(f_main, '', 10)
-            pdf.set_text_color(0, 0, 0)
+            pdf.set_font(f_main, '', 8)
+            pdf.set_text_color(30, 30, 30)
             if '**' in clean_line:
                 parts = clean_line.split('**')
                 for idx_p, part in enumerate(parts):
-                    if not pdf.custom_font_active:
-                        if idx_p % 2 == 1: pdf.set_font(f_main, 'B', 10)
-                        else: pdf.set_font(f_main, '', 10)
-                    pdf.write(6, part)
-                pdf.ln(6)
+                    if idx_p % 2 == 1: pdf.set_font(f_main, 'B', 8)
+                    else: pdf.set_font(f_main, '', 8)
+                    pdf.write(5, part)
+                pdf.ln(5)
             else:
-                pdf.multi_cell(0, 6, clean_line, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+                pdf.multi_cell(0, 5, clean_line, align='L')
+        pdf.ln(1)
 
     return bytes(pdf.output())
 
