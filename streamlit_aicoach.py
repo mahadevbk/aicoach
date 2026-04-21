@@ -1321,7 +1321,8 @@ with tab1:
             if "report_text" in st.session_state: del st.session_state["report_text"]
             if "final_video" in st.session_state: del st.session_state["final_video"]
 
-            model_task = download_model()            t1_p = os.path.join(tempfile.gettempdir(), f"l_raw.mp4")
+            model_task = download_model()
+            t1_p = os.path.join(tempfile.gettempdir(), f"l_raw.mp4")
             with open(t1_p, "wb") as f: f.write(u1.getbuffer())
             
             with st.status(f"ANALYZING {selected_sport.upper()}...") as status:
