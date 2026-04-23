@@ -34,37 +34,32 @@ class NumpyEncoder(json.JSONEncoder):
 
 def apply_impact_slow_mo(input_path, output_path, impact_frame, fps):
     """
-    Applies a gradual speed ramp using FFmpeg.
-    Starts at 1x, ramps down to 0.25x at the impact frame, and ramps back to 1x.
+    Revised speed ramp: 1x -> 0.25x at impact -> 1x.
+    Uses a 1.5s window (0.75s before/after) for a smoother transition.
     """
-    # impact_frame is the frame index from your telemetry data
     t_impact = impact_frame / fps
+    t_start = max(0, t_impact - 0.75)
+    t_end = t_impact + 0.75
     
-    # We define a 2-second "window of interest" around the impact
-    # T < t_impact - 1.0 : Speed is 1.0
-    # T approx t_impact  : Speed is 0.25 (PTS multiplied by 4)
-    # This filter uses a conditional logic to change the Presentation Time Stamp (PTS)
-    # 'trim' ensures we don't get frozen frames at the end due to the time expansion
-    
+    # Logic: 
+    # - Before t_start: Normal speed (T)
+    # - Between t_start/t_end: 0.25x speed (expanded by 4x)
+    # - After t_end: Normal speed, but shifted by the 4.5s added by the slow-mo
     filter_script = (
-        f"setpts='if(between(T,{t_impact}-0.5,{t_impact}+0.5), "
-        f"(T-({t_impact}-0.5))*4 + ({t_impact}-0.5), " # 0.25x speed zone
-        f"if(gt(T,{t_impact}+0.5), T+1.5, T))'" # Offset the rest of video to match new timeline
+        f"setpts='if(lt(T,{t_start}), T, "
+        f"if(lt(T,{t_end}), {t_start}+(T-{t_start})*4, "
+        f"T+4.5))'"
     )
 
     cmd = [
         'ffmpeg', '-y', '-i', input_path,
         '-filter:v', filter_script,
-        '-c:a', 'copy', # Keep original audio (will be out of sync in slow-mo)
-        output_path
+        '-c:a', 'copy', output_path
     ]
     
-    try:
-        subprocess.run(cmd, check=True, capture_output=True)
-        return output_path
-    except subprocess.CalledProcessError as e:
-        st.error(f"FFmpeg Error: {e.stderr.decode()}")
-        return input_path
+    import subprocess
+    subprocess.run(cmd, check=True, capture_output=True)
+    return output_path
 
 
 # ============================================================================
@@ -1202,6 +1197,10 @@ def analyze_vid(path, model):
             prev_w = w
     cap.release(); return {"history": history, "raw": raw, "fps": fps, "total": len(history), "impact": impact_f}
 
+# Finer skeletal specs
+THIN_JOINT_SPEC = (0, 255, 0)  # Bright Neon Green joints
+THIN_BONE_SPEC = (255, 255, 255) # Pure White bones
+
 def draw_neon_skeleton(img, lms, alpha=0.3):
     if not lms: return
     overlay = img.copy()
@@ -1209,10 +1208,10 @@ def draw_neon_skeleton(img, lms, alpha=0.3):
     for s, e in FULL_SKELETON:
         p1 = (int(lms[s].x*img.shape[1]), int(lms[s].y*img.shape[0]))
         p2 = (int(lms[e].x*img.shape[1]), int(lms[e].y*img.shape[0]))
-        cv2.line(overlay, p1, p2, (128, 128, 128), 2, cv2.LINE_AA)
+        cv2.line(overlay, p1, p2, THIN_BONE_SPEC, 1, cv2.LINE_AA)
     for i in range(len(lms)):
         pt = (int(lms[i].x*img.shape[1]), int(lms[i].y*img.shape[0]))
-        cv2.circle(overlay, pt, 4, (0, 0, 255), -1, cv2.LINE_AA)
+        cv2.circle(overlay, pt, 2, THIN_JOINT_SPEC, -1, cv2.LINE_AA)
     cv2.addWeighted(overlay, alpha, img, 1 - alpha, 0, img)
 
 def render_pro_stereo(p1, p2, h1, h2, f1, f2, fps):
