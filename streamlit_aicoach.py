@@ -1785,8 +1785,6 @@ with tab3:
                 st.write(f"DEBUG: keys in tele_opt: {list(st.session_state['tele_opt'].keys())}")
                 st.write(f"DEBUG: 'event_snapshot' in tele_opt: {'event_snapshot' in st.session_state['tele_opt']}")
             
-            if "tele_opt" in st.session_state and "event_snapshot" in st.session_state:
-			# --- END OF SLOW-MOTION REPLAY RENDER ---
             if st.button("🤖 GENERATE AI COACHING REPORT", type="primary", width="stretch"):
                 with st.status("AI IS ANALYZING...") as status:
                     #report_text = generate_pro_report(st.session_state["brief"])
