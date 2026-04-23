@@ -40,9 +40,6 @@ def apply_impact_slow_mo(input_path, output_path, impact_frame, fps):
     """
     import subprocess
     
-    # Note: Using print() for debugging since this function is called in a spinner context
-    # Streamlit will show these in logs if needed
-    
     # Convert frame number to seconds
     t_impact = impact_frame / fps
     t_start = max(0, t_impact - 0.75)
@@ -69,11 +66,12 @@ def apply_impact_slow_mo(input_path, output_path, impact_frame, fps):
         if result.returncode != 0:
             raise Exception(f"Before segment error: {result.stderr}")
         
-        # Extract and slow down middle segment  
+        # Extract and slow down middle segment
+        # Use setpts to slow down: multiply timestamps by 4 (1/0.25 = 4) to slow to 0.25x speed
         cmd_middle = [
             'ffmpeg', '-y', '-i', input_path,
-            '-vf', f'select=gte(n\\,{start_frame})*lt(n\\,{end_frame}),setpts=PTS-STARTPTS,speed=0.25',
-            '-af', f'aselect=gte(t\\,{t_start})*lt(t\\,{t_end}),asetpts=PTS-STARTPTS,atempo=0.25',
+            '-vf', f'select=gte(n\\,{start_frame})*lt(n\\,{end_frame}),setpts=4*PTS-STARTPTS',
+            '-af', f'aselect=gte(t\\,{t_start})*lt(t\\,{t_end}),asetpts=4*PTS-STARTPTS,atempo=0.25',
             temp_middle_slow
         ]
         result = subprocess.run(cmd_middle, capture_output=True, text=True)
@@ -1066,9 +1064,6 @@ def display_file_info(uploaded_file):
     if uploaded_file:
         file_size_mb = uploaded_file.size / (1024 * 1024)
         st.caption(f"📊 {uploaded_file.name} • {file_size_mb:.1f} MB")
-    if uploaded_file:
-        file_size_mb = uploaded_file.size / (1024 * 1024)
-        st.caption(f"📊 {uploaded_file.name} • {file_size_mb:.1f} MB")
 
 def draw_mobile_metric_grid(metrics_dict):
     items = list(metrics_dict.items())
@@ -1460,14 +1455,12 @@ with tab1:
     
     st.markdown("#### PRIMARY VIEW", unsafe_allow_html=True)
     u1 = st.file_uploader("UPLOAD MAIN ANGLE", type=["mp4","mov"], key="u1_upload", label_visibility="collapsed")
-    if u1: display_file_info(u1)
     
     is_stereo = st.toggle("STEREOGRAPHIC MODE (DUAL VIEW)", value=False, key="st_toggle")
     u2 = None
     if is_stereo:
         st.markdown("#### SECONDARY VIEW", unsafe_allow_html=True)
         u2 = st.file_uploader("UPLOAD SECOND ANGLE", type=["mp4","mov"], key="u2_upload", label_visibility="collapsed")
-        if u2: display_file_info(u2)
 
     if u1:
         if st.button("PROCEED TO ANALYSIS", type="primary", width="stretch"):
