@@ -40,25 +40,17 @@ def apply_impact_slow_mo(input_path, output_path, impact_frame, fps):
     """
     import subprocess
     
-    print(f"DEBUG: apply_impact_slow_mo called with:")
-    print(f"  input_path: {input_path}")
-    print(f"  output_path: {output_path}")
-    print(f"  impact_frame: {impact_frame}")
-    print(f"  fps: {fps}")
-    print(f"  input_path exists: {os.path.exists(input_path)}")
+    # Note: Using print() for debugging since this function is called in a spinner context
+    # Streamlit will show these in logs if needed
     
     # Convert frame number to seconds
     t_impact = impact_frame / fps
     t_start = max(0, t_impact - 0.75)
     t_end = t_impact + 0.75
     
-    print(f"  t_impact: {t_impact}, t_start: {t_start}, t_end: {t_end}")
-    
     # Calculate frame numbers for segments
     start_frame = max(0, int(t_start * fps))
     end_frame = int(t_end * fps)
-    
-    print(f"  start_frame: {start_frame}, end_frame: {end_frame}")
     
     temp_before = "temp_before.mp4"
     temp_middle = "temp_middle.mp4"
@@ -67,7 +59,6 @@ def apply_impact_slow_mo(input_path, output_path, impact_frame, fps):
     
     try:
         # Extract before segment
-        print(f"Extracting before segment (frames 0-{start_frame})...")
         cmd_before = [
             'ffmpeg', '-y', '-i', input_path,
             '-vf', f'select=lt(n\\,{start_frame}),setpts=PTS-STARTPTS',
@@ -76,10 +67,9 @@ def apply_impact_slow_mo(input_path, output_path, impact_frame, fps):
         ]
         result = subprocess.run(cmd_before, capture_output=True, text=True)
         if result.returncode != 0:
-            print(f"ERROR in before segment: {result.stderr}")
+            raise Exception(f"Before segment error: {result.stderr}")
         
         # Extract and slow down middle segment  
-        print(f"Extracting middle segment (frames {start_frame}-{end_frame}) and slowing to 0.25x...")
         cmd_middle = [
             'ffmpeg', '-y', '-i', input_path,
             '-vf', f'select=gte(n\\,{start_frame})*lt(n\\,{end_frame}),setpts=PTS-STARTPTS,speed=0.25',
@@ -88,10 +78,9 @@ def apply_impact_slow_mo(input_path, output_path, impact_frame, fps):
         ]
         result = subprocess.run(cmd_middle, capture_output=True, text=True)
         if result.returncode != 0:
-            print(f"ERROR in middle segment: {result.stderr}")
+            raise Exception(f"Middle segment error: {result.stderr}")
         
         # Extract after segment
-        print(f"Extracting after segment (frames {end_frame}+)...")
         cmd_after = [
             'ffmpeg', '-y', '-i', input_path,
             '-vf', f'select=gte(n\\,{end_frame}),setpts=PTS-STARTPTS',
@@ -100,10 +89,9 @@ def apply_impact_slow_mo(input_path, output_path, impact_frame, fps):
         ]
         result = subprocess.run(cmd_after, capture_output=True, text=True)
         if result.returncode != 0:
-            print(f"ERROR in after segment: {result.stderr}")
+            raise Exception(f"After segment error: {result.stderr}")
         
         # Concatenate all three
-        print("Concatenating segments...")
         concat_file = "concat_list.txt"
         with open(concat_file, 'w') as f:
             f.write(f"file '{temp_before}'\n")
@@ -117,21 +105,14 @@ def apply_impact_slow_mo(input_path, output_path, impact_frame, fps):
         ]
         result = subprocess.run(cmd_concat, capture_output=True, text=True)
         if result.returncode != 0:
-            print(f"ERROR in concat: {result.stderr}")
-        else:
-            print(f"SUCCESS: Slow-mo video created at {output_path}")
+            raise Exception(f"Concat error: {result.stderr}")
         
         # Clean up temp files
-        print("Cleaning up temp files...")
         for temp_file in [temp_before, temp_middle, temp_after, temp_middle_slow, concat_file]:
             if os.path.exists(temp_file):
                 os.remove(temp_file)
-                print(f"  Removed {temp_file}")
                 
     except Exception as e:
-        print(f"EXCEPTION in slow-mo processing: {e}")
-        import traceback
-        traceback.print_exc()
         raise
     
     return output_path
@@ -1064,7 +1045,22 @@ def draw_modern_metric(label, value, delta, icon="⚡"):
         </div>
     """, unsafe_allow_html=True)
 
-def display_file_info(uploaded_file):
+def convert_mov_to_mp4(mov_path, mp4_path):
+    """
+    Convert MOV file to MP4 format for consistent processing.
+    Uses FFmpeg with fast copy codec to avoid re-encoding.
+    """
+    import subprocess
+    cmd = [
+        'ffmpeg', '-y', '-i', mov_path,
+        '-c:v', 'copy', '-c:a', 'aac',
+        '-movflags', '+faststart',
+        mp4_path
+    ]
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    if result.returncode != 0:
+        raise Exception(f"MOV to MP4 conversion failed: {result.stderr}")
+    return mp4_path
     if uploaded_file:
         file_size_mb = uploaded_file.size / (1024 * 1024)
         st.caption(f"📊 {uploaded_file.name} • {file_size_mb:.1f} MB")
@@ -1484,14 +1480,39 @@ with tab1:
 
             model_task = download_model()
             t1_p = os.path.join(tempfile.gettempdir(), f"l_raw.mp4")
-            with open(t1_p, "wb") as f: f.write(u1.getbuffer())
+            
+            # Save uploaded file
+            temp_upload = os.path.join(tempfile.gettempdir(), f"l_upload_{int(time.time())}")
+            with open(temp_upload, "wb") as f: 
+                f.write(u1.getbuffer())
+            
+            # Convert MOV to MP4 if needed
+            if u1.name.lower().endswith('.mov'):
+                st.info("🎬 Converting MOV to MP4 for processing...")
+                convert_mov_to_mp4(temp_upload, t1_p)
+                os.remove(temp_upload)
+            else:
+                os.rename(temp_upload, t1_p)
             
             with st.status(f"ANALYZING {selected_sport.upper()}...") as status:
                 d1 = analyze_vid(t1_p, model_task)
                 d2, t2_p = None, None
                 if is_stereo and u2:
                     t2_p = os.path.join(tempfile.gettempdir(), f"s_raw.mp4")
-                    with open(t2_p, "wb") as f: f.write(u2.getbuffer())
+                    
+                    # Save second upload
+                    temp_upload2 = os.path.join(tempfile.gettempdir(), f"s_upload_{int(time.time())}")
+                    with open(temp_upload2, "wb") as f: 
+                        f.write(u2.getbuffer())
+                    
+                    # Convert MOV to MP4 if needed
+                    if u2.name.lower().endswith('.mov'):
+                        st.info("🎬 Converting MOV to MP4 for processing...")
+                        convert_mov_to_mp4(temp_upload2, t2_p)
+                        os.remove(temp_upload2)
+                    else:
+                        os.rename(temp_upload2, t2_p)
+                    
                     d2 = analyze_vid(t2_p, model_task)
                 
                 st.session_state["data_current"] = {"d1": d1, "d2": d2, "p1": t1_p, "p2": t2_p}
@@ -1617,6 +1638,9 @@ with tab2:
                 # Extract and store event_snapshot for slow-mo replay
                 if "event_snapshot" in tele_opt:
                     st.session_state["event_snapshot"] = tele_opt["event_snapshot"]
+                    st.toast("✅ event_snapshot extracted and stored")
+                else:
+                    st.error("❌ event_snapshot NOT found in tele_opt! Keys available: " + str(list(tele_opt.keys())))
                 #st.session_state["brief"] = generate_brief(tele_opt)
                 st.session_state["brief"] = generate_brief.generate_brief(
 					tele_opt,
@@ -1675,6 +1699,12 @@ with tab3:
             
             st.markdown("---")
             # --- START OF SLOW-MOTION REPLAY RENDER ---
+            st.write(f"DEBUG: 'tele_opt' in session_state: {'tele_opt' in st.session_state}")
+            st.write(f"DEBUG: 'event_snapshot' in session_state: {'event_snapshot' in st.session_state}")
+            if "tele_opt" in st.session_state:
+                st.write(f"DEBUG: keys in tele_opt: {list(st.session_state['tele_opt'].keys())}")
+                st.write(f"DEBUG: 'event_snapshot' in tele_opt: {'event_snapshot' in st.session_state['tele_opt']}")
+            
             if "tele_opt" in st.session_state and "event_snapshot" in st.session_state:
                 st.markdown("---")
                 st.subheader("🎥 IMPACT REPLAY (0.25x Slow-Mo)")
