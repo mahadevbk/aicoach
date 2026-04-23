@@ -1606,7 +1606,7 @@ with tab3:
                 fps = st.session_state["tele_opt"]["metadata"].get("fps", 30)
                 
                 # File paths
-                input_vid = "temp_video.mp4" 
+                input_vid = st.session_state["final_video"]  # Use the actual final video
                 slow_mo_output = "impact_replay.mp4"
 
                 # Create the video if it doesn't exist yet
@@ -1659,7 +1659,7 @@ with tab3:
             fps = st.session_state["tele_opt"]["metadata"].get("fps", 30)
             
             # Define paths
-            input_vid = "temp_video.mp4" 
+            input_vid = st.session_state["final_video"]  # Use the actual final video
             slow_mo_output = "impact_replay.mp4"
 
             # Create the replay video if it doesn't exist
