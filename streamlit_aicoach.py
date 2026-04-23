@@ -1619,10 +1619,10 @@ with tab3:
                         except Exception as e:
                             st.error(f"Replay Error: {e}")
 
-				# Display the video
-				if os.path.exists(slow_mo_output):
-					st.video(slow_mo_output)
-				st.caption("The video above slows down gradually to 0.25x speed at the point of impact.")
+                # Display the video
+                if os.path.exists(slow_mo_output):
+                    st.video(slow_mo_output)
+                st.caption("The video above slows down gradually to 0.25x speed at the point of impact.")
 			# --- END OF SLOW-MOTION REPLAY RENDER ---
             if st.button("🤖 GENERATE AI COACHING REPORT", type="primary", width="stretch"):
                 with st.status("AI IS ANALYZING...") as status:
