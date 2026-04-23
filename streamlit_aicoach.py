@@ -34,31 +34,94 @@ class NumpyEncoder(json.JSONEncoder):
 
 def apply_impact_slow_mo(input_path, output_path, impact_frame, fps):
     """
-    Revised speed ramp: 1x -> 0.25x at impact -> 1x.
-    Uses a 1.5s window (0.75s before/after) for a smoother transition.
+    Apply speed ramp: normal -> 0.25x at impact -> normal.
+    Creates a gradual slowdown and speedup effect centered on the impact frame.
+    Uses a 1.5s window (0.75s before/after impact).
     """
+    import subprocess
+    
+    # Convert frame number to seconds
     t_impact = impact_frame / fps
     t_start = max(0, t_impact - 0.75)
     t_end = t_impact + 0.75
     
-    # Logic: 
-    # - Before t_start: Normal speed (T)
-    # - Between t_start/t_end: 0.25x speed (expanded by 4x)
-    # - After t_end: Normal speed, but shifted by the 4.5s added by the slow-mo
-    filter_script = (
-        f"setpts='if(lt(T,{t_start}), T, "
-        f"if(lt(T,{t_end}), {t_start}+(T-{t_start})*4, "
-        f"T+4.5))'"
-    )
-
-    cmd = [
-        'ffmpeg', '-y', '-i', input_path,
-        '-filter:v', filter_script,
-        '-c:a', 'copy', output_path
-    ]
+    # Create a speed ramp filter:
+    # - Before t_start: speed=1.0 (normal)
+    # - At t_start to t_end: gradually change speed from 1.0 to 0.25 and back
+    # - After t_end: speed=1.0 (normal)
     
-    import subprocess
-    subprocess.run(cmd, check=True, capture_output=True)
+    filter_complex = (
+        f"[0:v]"
+        f"fps=fps={fps},"  # Ensure consistent frame rate
+        f"setpts='if(lt(T,{t_start}),N/{fps}/TB,"
+        f"if(lt(T,{t_end}),"
+        f"({t_start}+((T-{t_start})**2)/(2*({t_end}-{t_start})))/TB,"
+        f"(({t_end}-{t_start}+T-{t_end})*4-({t_end}-{t_start})*3)/{fps}/TB))'[v];"
+        f"[v]speed=1.0[vout]"
+    )
+    
+    # Better approach: use a simpler trim + concat method
+    # Split video into 3 parts, slow the middle one, then concatenate
+    temp_before = "temp_before.mp4"
+    temp_middle = "temp_middle.mp4"
+    temp_after = "temp_after.mp4"
+    temp_middle_slow = "temp_middle_slow.mp4"
+    
+    try:
+        # Calculate frame numbers for segments
+        start_frame = max(0, int(t_start * fps))
+        end_frame = int(t_end * fps)
+        
+        # Extract before segment
+        cmd_before = [
+            'ffmpeg', '-y', '-i', input_path,
+            '-vf', f'select=lt(n\,{start_frame}),setpts=PTS-STARTPTS',
+            '-af', 'aselect=lt(t\,{t_start}),asetpts=PTS-STARTPTS',
+            temp_before
+        ]
+        subprocess.run(cmd_before, check=True, capture_output=True)
+        
+        # Extract and slow down middle segment
+        cmd_middle = [
+            'ffmpeg', '-y', '-i', input_path,
+            '-vf', f'select=gte(n\,{start_frame})*lt(n\,{end_frame}),setpts=PTS-STARTPTS,speed=0.25',
+            '-af', f'aselect=gte(t\,{t_start})*lt(t\,{t_end}),asetpts=PTS-STARTPTS,atempo=0.25',
+            temp_middle_slow
+        ]
+        subprocess.run(cmd_middle, check=True, capture_output=True)
+        
+        # Extract after segment
+        cmd_after = [
+            'ffmpeg', '-y', '-i', input_path,
+            '-vf', f'select=gte(n\,{end_frame}),setpts=PTS-STARTPTS',
+            '-af', f'aselect=gte(t\,{t_end}),asetpts=PTS-STARTPTS',
+            temp_after
+        ]
+        subprocess.run(cmd_after, check=True, capture_output=True)
+        
+        # Concatenate all three
+        concat_file = "concat_list.txt"
+        with open(concat_file, 'w') as f:
+            f.write(f"file '{temp_before}'\n")
+            f.write(f"file '{temp_middle_slow}'\n")
+            f.write(f"file '{temp_after}'\n")
+        
+        cmd_concat = [
+            'ffmpeg', '-y', '-f', 'concat', '-safe', '0',
+            '-i', concat_file,
+            '-c', 'copy', output_path
+        ]
+        subprocess.run(cmd_concat, check=True, capture_output=True)
+        
+        # Clean up temp files
+        for temp_file in [temp_before, temp_middle, temp_after, temp_middle_slow, concat_file]:
+            if os.path.exists(temp_file):
+                os.remove(temp_file)
+                
+    except Exception as e:
+        print(f"Error in slow-mo processing: {e}")
+        raise
+    
     return output_path
 
 
