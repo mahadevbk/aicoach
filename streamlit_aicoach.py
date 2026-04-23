@@ -1598,26 +1598,26 @@ with tab3:
             
             st.markdown("---")
             # --- START OF SLOW-MOTION REPLAY RENDER ---
-			if "tele_opt" in st.session_state and "event_snapshot" in st.session_state:
-				st.markdown("---")
-				st.subheader("🎥 IMPACT REPLAY (0.25x Slow-Mo)")
-				
-				# Get data for the ramp
-				impact_f = st.session_state["event_snapshot"].get("frame_number", 0)
-				fps = st.session_state["tele_opt"]["metadata"].get("fps", 30)
-				
-				# File paths
-				input_vid = "temp_video.mp4" 
-				slow_mo_output = "impact_replay.mp4"
+            if "tele_opt" in st.session_state and "event_snapshot" in st.session_state:
+                st.markdown("---")
+                st.subheader("🎥 IMPACT REPLAY (0.25x Slow-Mo)")
+                
+                # Get data for the ramp
+                impact_f = st.session_state["event_snapshot"].get("frame_number", 0)
+                fps = st.session_state["tele_opt"]["metadata"].get("fps", 30)
+                
+                # File paths
+                input_vid = "temp_video.mp4" 
+                slow_mo_output = "impact_replay.mp4"
 
-				# Create the video if it doesn't exist yet
-				if not os.path.exists(slow_mo_output):
-					with st.spinner("🎬 Creating gradual slow-motion replay..."):
-						try:
-							# Call the function we added to Section 1
-							apply_impact_slow_mo(input_vid, slow_mo_output, impact_f, fps)
-						except Exception as e:
-							st.error(f"Replay Error: {e}")
+                # Create the video if it doesn't exist yet
+                if not os.path.exists(slow_mo_output):
+                    with st.spinner("🎬 Creating gradual slow-motion replay..."):
+                        try:
+                            # Call the function we added to Section 1
+                            apply_impact_slow_mo(input_vid, slow_mo_output, impact_f, fps)
+                        except Exception as e:
+                            st.error(f"Replay Error: {e}")
 
 				# Display the video
 				if os.path.exists(slow_mo_output):
