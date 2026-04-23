@@ -34,28 +34,39 @@ class NumpyEncoder(json.JSONEncoder):
 
 def apply_impact_slow_mo(input_path, output_path, impact_frame, fps):
     """
-    Apply speed ramp: normal -> 0.25x at impact -> normal.
-    Creates a gradual slowdown and speedup effect centered on the impact frame.
-    Uses a 1.5s window (0.75s before/after impact).
+    Apply speed ramp: normal (1x) -> slow (0.25x) at impact -> normal (1x).
+    Creates a smooth ramp with 5 segments for proper timing:
+    1. Before impact (normal speed)
+    2. Ramp down to slow (0.5x speed over 0.5s)
+    3. At impact (0.25x speed - holds for impact moment)
+    4. Ramp up to normal (0.5x back to 1x over 0.5s)
+    5. After impact (normal speed)
     """
     import subprocess
     
     # Convert frame number to seconds
     t_impact = impact_frame / fps
-    t_start = max(0, t_impact - 0.75)
-    t_end = t_impact + 0.75
     
-    # Calculate frame numbers for segments
-    start_frame = max(0, int(t_start * fps))
-    end_frame = int(t_end * fps)
+    # Define timing windows
+    ramp_down_duration = 0.5  # 0.5 seconds to ramp down
+    impact_duration = 0.5     # 0.5 seconds at slow speed
+    ramp_up_duration = 0.5    # 0.5 seconds to ramp back up
     
-    temp_before = "temp_before.mp4"
-    temp_middle = "temp_middle.mp4"
-    temp_after = "temp_after.mp4"
-    temp_middle_slow = "temp_middle_slow.mp4"
+    # Time boundaries
+    t_ramp_down_start = max(0, t_impact - ramp_down_duration)
+    t_impact_start = t_impact
+    t_impact_end = t_impact + impact_duration
+    t_ramp_up_end = t_impact_end + ramp_up_duration
     
+    # Convert to frame numbers
+    f_ramp_down_start = max(0, int(t_ramp_down_start * fps))
+    f_impact_start = int(t_impact_start * fps)
+    f_impact_end = int(t_impact_end * fps)
+    f_ramp_up_end = int(t_ramp_up_end * fps)
+    
+    temp_files = []
     try:
-        # Get total frame count from input video
+        # Get total frame count
         probe_cmd = [
             'ffprobe', '-v', 'error', 
             '-select_streams', 'v:0',
@@ -65,83 +76,119 @@ def apply_impact_slow_mo(input_path, output_path, impact_frame, fps):
         ]
         probe_result = subprocess.run(probe_cmd, capture_output=True, text=True)
         probe_output = probe_result.stdout.strip().split('\n')
-        total_frames = int(probe_output[0]) if probe_output[0].isdigit() else 10000
+        total_frames = int(float(probe_output[0])) if probe_output[0] else 10000
         
-        # Adjust end_frame to not exceed total frames
-        end_frame = min(end_frame, total_frames - 1)
+        # Ensure frame boundaries are valid
+        f_impact_end = min(f_impact_end, total_frames - 1)
+        f_ramp_up_end = min(f_ramp_up_end, total_frames - 1)
         
-        # Extract before segment (0 to start_frame)
-        if start_frame > 0:
-            cmd_before = [
+        # Segment 1: Before ramp (normal speed: 0 to ramp_down_start)
+        temp_seg1 = "temp_seg1.mp4"
+        temp_files.append(temp_seg1)
+        if f_ramp_down_start > 0:
+            cmd_seg1 = [
                 'ffmpeg', '-y', '-i', input_path,
-                '-vf', f'select=lt(n\\,{start_frame}),setpts=PTS-STARTPTS',
-                '-c:v', 'libx264', '-preset', 'ultrafast',
-                temp_before
+                '-vf', f'select=lt(n\\,{f_ramp_down_start}),setpts=PTS-STARTPTS',
+                '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '23',
+                temp_seg1
             ]
-            result = subprocess.run(cmd_before, capture_output=True, text=True)
+            result = subprocess.run(cmd_seg1, capture_output=True, text=True)
             if result.returncode != 0:
-                raise Exception(f"Before segment error: {result.stderr[-500:]}")
-        else:
-            # If start_frame is 0, create empty placeholder
-            cmd_before = [
-                'ffmpeg', '-y', '-i', input_path,
-                '-ss', '0', '-t', '0.001',
-                '-c:v', 'libx264', '-preset', 'ultrafast',
-                temp_before
-            ]
-            result = subprocess.run(cmd_before, capture_output=True, text=True)
+                raise Exception(f"Segment 1 error: {result.stderr[-300:]}")
         
-        # Extract and slow down middle segment
-        if end_frame > start_frame:
-            cmd_middle = [
+        # Segment 2: Ramp down (0.5x speed: ramp_down_start to impact_start)
+        temp_seg2 = "temp_seg2.mp4"
+        temp_files.append(temp_seg2)
+        if f_impact_start > f_ramp_down_start:
+            cmd_seg2 = [
                 'ffmpeg', '-y', '-i', input_path,
-                '-vf', f'select=gte(n\\,{start_frame})*lt(n\\,{end_frame}),setpts=4*PTS-STARTPTS',
-                '-af', f'aselect=gte(t\\,{t_start})*lt(t\\,{t_end}),asetpts=4*PTS-STARTPTS,atempo=0.25',
-                '-c:v', 'libx264', '-preset', 'ultrafast',
-                temp_middle_slow
+                '-vf', f'select=gte(n\\,{f_ramp_down_start})*lt(n\\,{f_impact_start}),setpts=2*PTS-STARTPTS',
+                '-af', f'aselect=gte(t\\,{t_ramp_down_start})*lt(t\\,{t_impact_start}),asetpts=2*PTS-STARTPTS,atempo=0.5',
+                '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '23',
+                temp_seg2
             ]
-            result = subprocess.run(cmd_middle, capture_output=True, text=True)
+            result = subprocess.run(cmd_seg2, capture_output=True, text=True)
             if result.returncode != 0:
-                raise Exception(f"Middle segment error: {result.stderr[-500:]}")
-        else:
-            raise Exception("Middle segment is empty - impact frame selection issue")
+                raise Exception(f"Segment 2 error: {result.stderr[-300:]}")
         
-        # Extract after segment (end_frame to end)
-        cmd_after = [
-            'ffmpeg', '-y', '-i', input_path,
-            '-vf', f'select=gte(n\\,{end_frame}),setpts=PTS-STARTPTS',
-            '-c:v', 'libx264', '-preset', 'ultrafast',
-            temp_after
-        ]
-        result = subprocess.run(cmd_after, capture_output=True, text=True)
-        if result.returncode != 0:
-            raise Exception(f"After segment error: {result.stderr[-500:]}")
+        # Segment 3: At impact (0.25x speed: impact_start to impact_end)
+        temp_seg3 = "temp_seg3.mp4"
+        temp_files.append(temp_seg3)
+        if f_impact_end > f_impact_start:
+            cmd_seg3 = [
+                'ffmpeg', '-y', '-i', input_path,
+                '-vf', f'select=gte(n\\,{f_impact_start})*lt(n\\,{f_impact_end}),setpts=4*PTS-STARTPTS',
+                '-af', f'aselect=gte(t\\,{t_impact_start})*lt(t\\,{t_impact_end}),asetpts=4*PTS-STARTPTS,atempo=0.25',
+                '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '23',
+                temp_seg3
+            ]
+            result = subprocess.run(cmd_seg3, capture_output=True, text=True)
+            if result.returncode != 0:
+                raise Exception(f"Segment 3 error: {result.stderr[-300:]}")
         
-        # Concatenate all three using concat demuxer
+        # Segment 4: Ramp up (0.5x speed: impact_end to ramp_up_end)
+        temp_seg4 = "temp_seg4.mp4"
+        temp_files.append(temp_seg4)
+        if f_ramp_up_end > f_impact_end:
+            cmd_seg4 = [
+                'ffmpeg', '-y', '-i', input_path,
+                '-vf', f'select=gte(n\\,{f_impact_end})*lt(n\\,{f_ramp_up_end}),setpts=2*PTS-STARTPTS',
+                '-af', f'aselect=gte(t\\,{t_impact_end})*lt(t\\,{t_ramp_up_end}),asetpts=2*PTS-STARTPTS,atempo=0.5',
+                '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '23',
+                temp_seg4
+            ]
+            result = subprocess.run(cmd_seg4, capture_output=True, text=True)
+            if result.returncode != 0:
+                raise Exception(f"Segment 4 error: {result.stderr[-300:]}")
+        
+        # Segment 5: After ramp (normal speed: ramp_up_end to end)
+        temp_seg5 = "temp_seg5.mp4"
+        temp_files.append(temp_seg5)
+        if total_frames > f_ramp_up_end:
+            cmd_seg5 = [
+                'ffmpeg', '-y', '-i', input_path,
+                '-vf', f'select=gte(n\\,{f_ramp_up_end}),setpts=PTS-STARTPTS',
+                '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '23',
+                temp_seg5
+            ]
+            result = subprocess.run(cmd_seg5, capture_output=True, text=True)
+            if result.returncode != 0:
+                raise Exception(f"Segment 5 error: {result.stderr[-300:]}")
+        
+        # Concatenate all segments
         concat_file = "concat_list.txt"
         with open(concat_file, 'w') as f:
-            f.write(f"file '{temp_before}'\n")
-            f.write(f"file '{temp_middle_slow}'\n")
-            f.write(f"file '{temp_after}'\n")
+            f.write(f"file '{temp_seg1}'\n")
+            f.write(f"file '{temp_seg2}'\n")
+            f.write(f"file '{temp_seg3}'\n")
+            f.write(f"file '{temp_seg4}'\n")
+            f.write(f"file '{temp_seg5}'\n")
         
-        # Use concat demuxer with re-encoding to ensure compatibility
         cmd_concat = [
             'ffmpeg', '-y', '-f', 'concat', '-safe', '0',
             '-i', concat_file,
-            '-c:v', 'libx264', '-preset', 'ultrafast',
+            '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '23',
             '-c:a', 'aac',
             output_path
         ]
         result = subprocess.run(cmd_concat, capture_output=True, text=True)
         if result.returncode != 0:
-            raise Exception(f"Concat error: {result.stderr[-500:]}")
+            raise Exception(f"Concat error: {result.stderr[-300:]}")
         
-        # Clean up temp files
-        for temp_file in [temp_before, temp_middle_slow, temp_after, concat_file]:
+        # Clean up all temp files
+        if os.path.exists(concat_file):
+            os.remove(concat_file)
+        for temp_file in temp_files:
             if os.path.exists(temp_file):
                 os.remove(temp_file)
                 
     except Exception as e:
+        # Clean up on error
+        if os.path.exists(concat_file):
+            os.remove(concat_file)
+        for temp_file in temp_files:
+            if os.path.exists(temp_file):
+                os.remove(temp_file)
         raise
     
     return output_path
@@ -1486,12 +1533,16 @@ with tab1:
     
     st.markdown("#### PRIMARY VIEW", unsafe_allow_html=True)
     u1 = st.file_uploader("UPLOAD MAIN ANGLE", type=["mp4","mov"], key="u1_upload", label_visibility="collapsed")
+    if u1:
+        st.caption(f"📊 {u1.name}")
     
     is_stereo = st.toggle("STEREOGRAPHIC MODE (DUAL VIEW)", value=False, key="st_toggle")
     u2 = None
     if is_stereo:
         st.markdown("#### SECONDARY VIEW", unsafe_allow_html=True)
         u2 = st.file_uploader("UPLOAD SECOND ANGLE", type=["mp4","mov"], key="u2_upload", label_visibility="collapsed")
+        if u2:
+            st.caption(f"📊 {u2.name}")
 
     if u1:
         if st.button("PROCEED TO ANALYSIS", type="primary", width="stretch"):
@@ -1735,30 +1786,6 @@ with tab3:
                 st.write(f"DEBUG: 'event_snapshot' in tele_opt: {'event_snapshot' in st.session_state['tele_opt']}")
             
             if "tele_opt" in st.session_state and "event_snapshot" in st.session_state:
-                st.markdown("---")
-                st.subheader("🎥 IMPACT REPLAY (0.25x Slow-Mo)")
-                
-                # Get data for the ramp
-                impact_f = st.session_state["event_snapshot"].get("frame_number", 0)
-                fps = st.session_state["tele_opt"]["metadata"].get("fps", 30)
-                
-                # File paths
-                input_vid = st.session_state["final_video"]  # Use the actual final video
-                slow_mo_output = "impact_replay.mp4"
-
-                # Create the video if it doesn't exist yet
-                if not os.path.exists(slow_mo_output):
-                    with st.spinner("🎬 Creating gradual slow-motion replay..."):
-                        try:
-                            # Call the function we added to Section 1
-                            apply_impact_slow_mo(input_vid, slow_mo_output, impact_f, fps)
-                        except Exception as e:
-                            st.error(f"Replay Error: {e}")
-
-                # Display the video
-                if os.path.exists(slow_mo_output):
-                    st.video(slow_mo_output)
-                st.caption("The video above slows down gradually to 0.25x speed at the point of impact.")
 			# --- END OF SLOW-MOTION REPLAY RENDER ---
             if st.button("🤖 GENERATE AI COACHING REPORT", type="primary", width="stretch"):
                 with st.status("AI IS ANALYZING...") as status:
