@@ -32,6 +32,41 @@ class NumpyEncoder(json.JSONEncoder):
         if isinstance(obj, np.bool_): return bool(obj)
         return super(NumpyEncoder, self).default(obj)
 
+def apply_impact_slow_mo(input_path, output_path, impact_frame, fps):
+    """
+    Applies a gradual speed ramp using FFmpeg.
+    Starts at 1x, ramps down to 0.25x at the impact frame, and ramps back to 1x.
+    """
+    # impact_frame is the frame index from your telemetry data
+    t_impact = impact_frame / fps
+    
+    # We define a 2-second "window of interest" around the impact
+    # T < t_impact - 1.0 : Speed is 1.0
+    # T approx t_impact  : Speed is 0.25 (PTS multiplied by 4)
+    # This filter uses a conditional logic to change the Presentation Time Stamp (PTS)
+    # 'trim' ensures we don't get frozen frames at the end due to the time expansion
+    
+    filter_script = (
+        f"setpts='if(between(T,{t_impact}-0.5,{t_impact}+0.5), "
+        f"(T-({t_impact}-0.5))*4 + ({t_impact}-0.5), " # 0.25x speed zone
+        f"if(gt(T,{t_impact}+0.5), T+1.5, T))'" # Offset the rest of video to match new timeline
+    )
+
+    cmd = [
+        'ffmpeg', '-y', '-i', input_path,
+        '-filter:v', filter_script,
+        '-c:a', 'copy', # Keep original audio (will be out of sync in slow-mo)
+        output_path
+    ]
+    
+    try:
+        subprocess.run(cmd, check=True, capture_output=True)
+        return output_path
+    except subprocess.CalledProcessError as e:
+        st.error(f"FFmpeg Error: {e.stderr.decode()}")
+        return input_path
+
+
 # ============================================================================
 # 2. REPORT GENERATION FUNCTIONS (Original)
 # ============================================================================
@@ -1562,6 +1597,33 @@ with tab3:
                 st.download_button("💾 RAW JSON", json_data, f"{sport}_TELEMETRY.json", "application/json", width="stretch")
             
             st.markdown("---")
+            # --- START OF SLOW-MOTION REPLAY RENDER ---
+			if "tele_opt" in st.session_state and "event_snapshot" in st.session_state:
+				st.markdown("---")
+				st.subheader("🎥 IMPACT REPLAY (0.25x Slow-Mo)")
+				
+				# Get data for the ramp
+				impact_f = st.session_state["event_snapshot"].get("frame_number", 0)
+				fps = st.session_state["tele_opt"]["metadata"].get("fps", 30)
+				
+				# File paths
+				input_vid = "temp_video.mp4" 
+				slow_mo_output = "impact_replay.mp4"
+
+				# Create the video if it doesn't exist yet
+				if not os.path.exists(slow_mo_output):
+					with st.spinner("🎬 Creating gradual slow-motion replay..."):
+						try:
+							# Call the function we added to Section 1
+							apply_impact_slow_mo(input_vid, slow_mo_output, impact_f, fps)
+						except Exception as e:
+							st.error(f"Replay Error: {e}")
+
+				# Display the video
+				if os.path.exists(slow_mo_output):
+					st.video(slow_mo_output)
+				st.caption("The video above slows down gradually to 0.25x speed at the point of impact.")
+			# --- END OF SLOW-MOTION REPLAY RENDER ---
             if st.button("🤖 GENERATE AI COACHING REPORT", type="primary", width="stretch"):
                 with st.status("AI IS ANALYZING...") as status:
                     #report_text = generate_pro_report(st.session_state["brief"])
@@ -1587,6 +1649,34 @@ with tab3:
                 with c2:
                     pdf_f = create_pdf_report(st.session_state["report_text"], sport, action, hand)
                     st.download_button("📜 PDF REPORT", pdf_f, f"{sport}_ANALYSIS.pdf", width="stretch")
+                    
+            # --- PART 2: IMPACT REPLAY RENDER ---
+        if "tele_opt" in st.session_state and "event_snapshot" in st.session_state:
+            st.markdown("---")
+            st.markdown("### 🎥 IMPACT REPLAY (0.25x SLOW-MO)")
+            
+            # Extract impact frame and FPS
+            impact_f = st.session_state["event_snapshot"].get("frame_number", 0)
+            fps = st.session_state["tele_opt"]["metadata"].get("fps", 30)
+            
+            # Define paths
+            input_vid = "temp_video.mp4" 
+            slow_mo_output = "impact_replay.mp4"
+
+            # Create the replay video if it doesn't exist
+            if not os.path.exists(slow_mo_output):
+                with st.spinner("🎬 PREPARING GRADUAL SLOW-MOTION REPLAY..."):
+                    try:
+                        # Call the function from Section 1
+                        apply_impact_slow_mo(input_vid, slow_mo_output, impact_f, fps)
+                    except Exception as e:
+                        st.error(f"Replay Rendering Error: {e}")
+
+            # Display the video
+            if os.path.exists(slow_mo_output):
+                st.video(slow_mo_output)
+                st.caption("Video starts at regular speed, slows to 0.25x at impact, and returns to regular speed.")
+        # ------------------------------------        
 
         if st.button("↺ ANALYZE ANOTHER VIDEO", width="stretch"):
             for key in list(st.session_state.keys()): del st.session_state[key]
