@@ -266,7 +266,7 @@ The telemetry data includes 'Detected Actions' with specific frame numbers in th
 
 def generate_pro_report(brief_content, sport="GENERAL", action="MOVEMENT"):
     """
-    Enhanced report generation with sport-specific context.
+    Enhanced report generation using the 2026 flagship budget model: Gemini 3.1 Flash-Lite.
     
     Args:
         brief_content (str): The telemetry brief text from generate_brief()
@@ -277,27 +277,33 @@ def generate_pro_report(brief_content, sport="GENERAL", action="MOVEMENT"):
         str: Generated coaching report text
     """
     try:
-        # Get available models
-        supported_models = [m.name for m in genai.list_models() 
-                          if 'generateContent' in m.supported_generation_methods]
-        priority = ['models/gemini-1.5-pro', 'models/gemini-1.5-flash']
-        selected_model = next((p for p in priority if p in supported_models), 
-                            supported_models[0] if supported_models else None)
-            
-        if not selected_model:
-            return "⚠️ AI Generation Error: No suitable Gemini models found."
- 
+        # POINT TO THE NEW 2026 STANDARD
+        # This replaces the old loop that looked for 1.5-pro
+        selected_model = 'models/gemini-3.1-flash-lite-preview'
+        
         # Initialize model
         report_model = genai.GenerativeModel(selected_model)
         
-        # Generate sport-specific instructions
+        # Generate sport-specific instructions (using your existing prompt helper)
         instructions = generate_sport_specific_prompt(sport, action, brief_content)
         
+        # Use a consistent generation config for high-quality, long-form output
+        generation_config = {
+            "temperature": 0.7,
+            "top_p": 0.95,
+            "max_output_tokens": 4096,
+        }
+        
         # Call API with enhanced prompt and brief content
-        response = report_model.generate_content([instructions, brief_content])
+        response = report_model.generate_content(
+            [instructions, brief_content],
+            generation_config=generation_config
+        )
+        
         return response.text
         
     except Exception as e:
+        # Check if the error is due to the model name (in case of regional rollout delays)
         return f"⚠️ AI Generation Error: {str(e)}"
  
 

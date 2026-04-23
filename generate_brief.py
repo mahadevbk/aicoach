@@ -468,14 +468,17 @@ Arm coordination:
 ## SECTION 10 — REPORT INSTRUCTIONS
 Generate a coaching report with these sections:
 1. Overview (2-3 sentences specific to {action.lower()})
-2. Overall Scores table
-3. Key Measurements table
-4. {action}-Specific Phase Analysis
-5. Coaching Recommendations (focused on {action.lower()} technique)
-6. Practice Plan table
-7. Data Notes
+2. Experts Coach's review of the athletes performance. The good and the weaknesses. Be encouraging and positive.
+3. Coaching Recommendations (focused on {action.lower()} technique)
+4. Practice Plan table
+5. Overall Scores table
+6. Risk assessments
+7. Key Measurements table
+8. {action}-Specific Phase Analysis
+9. Data Notes
+10. No player name has been provided in this report.
 
-Tone: professional, direct, action-specific. Length: 700-900 words.
+Tone: Encouraging, professional, direct, action-specific. Length: 700-900 words.
 
 === END OF BRIEF ===
 """
