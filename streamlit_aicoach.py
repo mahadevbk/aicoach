@@ -55,58 +55,89 @@ def apply_impact_slow_mo(input_path, output_path, impact_frame, fps):
     temp_middle_slow = "temp_middle_slow.mp4"
     
     try:
-        # Extract before segment
-        cmd_before = [
-            'ffmpeg', '-y', '-i', input_path,
-            '-vf', f'select=lt(n\\,{start_frame}),setpts=PTS-STARTPTS',
-            '-af', f'aselect=lt(t\\,{t_start}),asetpts=PTS-STARTPTS',
-            temp_before
+        # Get total frame count from input video
+        probe_cmd = [
+            'ffprobe', '-v', 'error', 
+            '-select_streams', 'v:0',
+            '-show_entries', 'stream=nb_frames,r_frame_rate',
+            '-of', 'default=noprint_wrappers=1:nokey=1:noescaped=1',
+            input_path
         ]
-        result = subprocess.run(cmd_before, capture_output=True, text=True)
-        if result.returncode != 0:
-            raise Exception(f"Before segment error: {result.stderr}")
+        probe_result = subprocess.run(probe_cmd, capture_output=True, text=True)
+        probe_output = probe_result.stdout.strip().split('\n')
+        total_frames = int(probe_output[0]) if probe_output[0].isdigit() else 10000
+        
+        # Adjust end_frame to not exceed total frames
+        end_frame = min(end_frame, total_frames - 1)
+        
+        # Extract before segment (0 to start_frame)
+        if start_frame > 0:
+            cmd_before = [
+                'ffmpeg', '-y', '-i', input_path,
+                '-vf', f'select=lt(n\\,{start_frame}),setpts=PTS-STARTPTS',
+                '-c:v', 'libx264', '-preset', 'ultrafast',
+                temp_before
+            ]
+            result = subprocess.run(cmd_before, capture_output=True, text=True)
+            if result.returncode != 0:
+                raise Exception(f"Before segment error: {result.stderr[-500:]}")
+        else:
+            # If start_frame is 0, create empty placeholder
+            cmd_before = [
+                'ffmpeg', '-y', '-i', input_path,
+                '-ss', '0', '-t', '0.001',
+                '-c:v', 'libx264', '-preset', 'ultrafast',
+                temp_before
+            ]
+            result = subprocess.run(cmd_before, capture_output=True, text=True)
         
         # Extract and slow down middle segment
-        # Use setpts to slow down: multiply timestamps by 4 (1/0.25 = 4) to slow to 0.25x speed
-        cmd_middle = [
-            'ffmpeg', '-y', '-i', input_path,
-            '-vf', f'select=gte(n\\,{start_frame})*lt(n\\,{end_frame}),setpts=4*PTS-STARTPTS',
-            '-af', f'aselect=gte(t\\,{t_start})*lt(t\\,{t_end}),asetpts=4*PTS-STARTPTS,atempo=0.25',
-            temp_middle_slow
-        ]
-        result = subprocess.run(cmd_middle, capture_output=True, text=True)
-        if result.returncode != 0:
-            raise Exception(f"Middle segment error: {result.stderr}")
+        if end_frame > start_frame:
+            cmd_middle = [
+                'ffmpeg', '-y', '-i', input_path,
+                '-vf', f'select=gte(n\\,{start_frame})*lt(n\\,{end_frame}),setpts=4*PTS-STARTPTS',
+                '-af', f'aselect=gte(t\\,{t_start})*lt(t\\,{t_end}),asetpts=4*PTS-STARTPTS,atempo=0.25',
+                '-c:v', 'libx264', '-preset', 'ultrafast',
+                temp_middle_slow
+            ]
+            result = subprocess.run(cmd_middle, capture_output=True, text=True)
+            if result.returncode != 0:
+                raise Exception(f"Middle segment error: {result.stderr[-500:]}")
+        else:
+            raise Exception("Middle segment is empty - impact frame selection issue")
         
-        # Extract after segment
+        # Extract after segment (end_frame to end)
         cmd_after = [
             'ffmpeg', '-y', '-i', input_path,
             '-vf', f'select=gte(n\\,{end_frame}),setpts=PTS-STARTPTS',
-            '-af', f'aselect=gte(t\\,{t_end}),asetpts=PTS-STARTPTS',
+            '-c:v', 'libx264', '-preset', 'ultrafast',
             temp_after
         ]
         result = subprocess.run(cmd_after, capture_output=True, text=True)
         if result.returncode != 0:
-            raise Exception(f"After segment error: {result.stderr}")
+            raise Exception(f"After segment error: {result.stderr[-500:]}")
         
-        # Concatenate all three
+        # Concatenate all three using concat demuxer
         concat_file = "concat_list.txt"
         with open(concat_file, 'w') as f:
             f.write(f"file '{temp_before}'\n")
             f.write(f"file '{temp_middle_slow}'\n")
             f.write(f"file '{temp_after}'\n")
         
+        # Use concat demuxer with re-encoding to ensure compatibility
         cmd_concat = [
             'ffmpeg', '-y', '-f', 'concat', '-safe', '0',
             '-i', concat_file,
-            '-c', 'copy', output_path
+            '-c:v', 'libx264', '-preset', 'ultrafast',
+            '-c:a', 'aac',
+            output_path
         ]
         result = subprocess.run(cmd_concat, capture_output=True, text=True)
         if result.returncode != 0:
-            raise Exception(f"Concat error: {result.stderr}")
+            raise Exception(f"Concat error: {result.stderr[-500:]}")
         
         # Clean up temp files
-        for temp_file in [temp_before, temp_middle, temp_after, temp_middle_slow, concat_file]:
+        for temp_file in [temp_before, temp_middle_slow, temp_after, concat_file]:
             if os.path.exists(temp_file):
                 os.remove(temp_file)
                 
