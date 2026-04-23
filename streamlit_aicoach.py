@@ -1061,6 +1061,11 @@ def convert_mov_to_mp4(mov_path, mp4_path):
     if result.returncode != 0:
         raise Exception(f"MOV to MP4 conversion failed: {result.stderr}")
     return mp4_path
+
+def display_file_info(uploaded_file):
+    if uploaded_file:
+        file_size_mb = uploaded_file.size / (1024 * 1024)
+        st.caption(f"📊 {uploaded_file.name} • {file_size_mb:.1f} MB")
     if uploaded_file:
         file_size_mb = uploaded_file.size / (1024 * 1024)
         st.caption(f"📊 {uploaded_file.name} • {file_size_mb:.1f} MB")
