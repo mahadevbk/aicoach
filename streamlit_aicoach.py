@@ -40,66 +40,70 @@ def apply_impact_slow_mo(input_path, output_path, impact_frame, fps):
     """
     import subprocess
     
+    print(f"DEBUG: apply_impact_slow_mo called with:")
+    print(f"  input_path: {input_path}")
+    print(f"  output_path: {output_path}")
+    print(f"  impact_frame: {impact_frame}")
+    print(f"  fps: {fps}")
+    print(f"  input_path exists: {os.path.exists(input_path)}")
+    
     # Convert frame number to seconds
     t_impact = impact_frame / fps
     t_start = max(0, t_impact - 0.75)
     t_end = t_impact + 0.75
     
-    # Create a speed ramp filter:
-    # - Before t_start: speed=1.0 (normal)
-    # - At t_start to t_end: gradually change speed from 1.0 to 0.25 and back
-    # - After t_end: speed=1.0 (normal)
+    print(f"  t_impact: {t_impact}, t_start: {t_start}, t_end: {t_end}")
     
-    filter_complex = (
-        f"[0:v]"
-        f"fps=fps={fps},"  # Ensure consistent frame rate
-        f"setpts='if(lt(T,{t_start}),N/{fps}/TB,"
-        f"if(lt(T,{t_end}),"
-        f"({t_start}+((T-{t_start})**2)/(2*({t_end}-{t_start})))/TB,"
-        f"(({t_end}-{t_start}+T-{t_end})*4-({t_end}-{t_start})*3)/{fps}/TB))'[v];"
-        f"[v]speed=1.0[vout]"
-    )
+    # Calculate frame numbers for segments
+    start_frame = max(0, int(t_start * fps))
+    end_frame = int(t_end * fps)
     
-    # Better approach: use a simpler trim + concat method
-    # Split video into 3 parts, slow the middle one, then concatenate
+    print(f"  start_frame: {start_frame}, end_frame: {end_frame}")
+    
     temp_before = "temp_before.mp4"
     temp_middle = "temp_middle.mp4"
     temp_after = "temp_after.mp4"
     temp_middle_slow = "temp_middle_slow.mp4"
     
     try:
-        # Calculate frame numbers for segments
-        start_frame = max(0, int(t_start * fps))
-        end_frame = int(t_end * fps)
-        
         # Extract before segment
+        print(f"Extracting before segment (frames 0-{start_frame})...")
         cmd_before = [
             'ffmpeg', '-y', '-i', input_path,
-            '-vf', f'select=lt(n\,{start_frame}),setpts=PTS-STARTPTS',
-            '-af', 'aselect=lt(t\,{t_start}),asetpts=PTS-STARTPTS',
+            '-vf', f'select=lt(n\\,{start_frame}),setpts=PTS-STARTPTS',
+            '-af', f'aselect=lt(t\\,{t_start}),asetpts=PTS-STARTPTS',
             temp_before
         ]
-        subprocess.run(cmd_before, check=True, capture_output=True)
+        result = subprocess.run(cmd_before, capture_output=True, text=True)
+        if result.returncode != 0:
+            print(f"ERROR in before segment: {result.stderr}")
         
-        # Extract and slow down middle segment
+        # Extract and slow down middle segment  
+        print(f"Extracting middle segment (frames {start_frame}-{end_frame}) and slowing to 0.25x...")
         cmd_middle = [
             'ffmpeg', '-y', '-i', input_path,
-            '-vf', f'select=gte(n\,{start_frame})*lt(n\,{end_frame}),setpts=PTS-STARTPTS,speed=0.25',
-            '-af', f'aselect=gte(t\,{t_start})*lt(t\,{t_end}),asetpts=PTS-STARTPTS,atempo=0.25',
+            '-vf', f'select=gte(n\\,{start_frame})*lt(n\\,{end_frame}),setpts=PTS-STARTPTS,speed=0.25',
+            '-af', f'aselect=gte(t\\,{t_start})*lt(t\\,{t_end}),asetpts=PTS-STARTPTS,atempo=0.25',
             temp_middle_slow
         ]
-        subprocess.run(cmd_middle, check=True, capture_output=True)
+        result = subprocess.run(cmd_middle, capture_output=True, text=True)
+        if result.returncode != 0:
+            print(f"ERROR in middle segment: {result.stderr}")
         
         # Extract after segment
+        print(f"Extracting after segment (frames {end_frame}+)...")
         cmd_after = [
             'ffmpeg', '-y', '-i', input_path,
-            '-vf', f'select=gte(n\,{end_frame}),setpts=PTS-STARTPTS',
-            '-af', f'aselect=gte(t\,{t_end}),asetpts=PTS-STARTPTS',
+            '-vf', f'select=gte(n\\,{end_frame}),setpts=PTS-STARTPTS',
+            '-af', f'aselect=gte(t\\,{t_end}),asetpts=PTS-STARTPTS',
             temp_after
         ]
-        subprocess.run(cmd_after, check=True, capture_output=True)
+        result = subprocess.run(cmd_after, capture_output=True, text=True)
+        if result.returncode != 0:
+            print(f"ERROR in after segment: {result.stderr}")
         
         # Concatenate all three
+        print("Concatenating segments...")
         concat_file = "concat_list.txt"
         with open(concat_file, 'w') as f:
             f.write(f"file '{temp_before}'\n")
@@ -111,15 +115,23 @@ def apply_impact_slow_mo(input_path, output_path, impact_frame, fps):
             '-i', concat_file,
             '-c', 'copy', output_path
         ]
-        subprocess.run(cmd_concat, check=True, capture_output=True)
+        result = subprocess.run(cmd_concat, capture_output=True, text=True)
+        if result.returncode != 0:
+            print(f"ERROR in concat: {result.stderr}")
+        else:
+            print(f"SUCCESS: Slow-mo video created at {output_path}")
         
         # Clean up temp files
+        print("Cleaning up temp files...")
         for temp_file in [temp_before, temp_middle, temp_after, temp_middle_slow, concat_file]:
             if os.path.exists(temp_file):
                 os.remove(temp_file)
+                print(f"  Removed {temp_file}")
                 
     except Exception as e:
-        print(f"Error in slow-mo processing: {e}")
+        print(f"EXCEPTION in slow-mo processing: {e}")
+        import traceback
+        traceback.print_exc()
         raise
     
     return output_path
@@ -1602,6 +1614,9 @@ with tab2:
                     tele_opt["metadata"]["detected_actions"] = st.session_state.manual_actions
                 
                 st.session_state["tele_opt"] = tele_opt
+                # Extract and store event_snapshot for slow-mo replay
+                if "event_snapshot" in tele_opt:
+                    st.session_state["event_snapshot"] = tele_opt["event_snapshot"]
                 #st.session_state["brief"] = generate_brief(tele_opt)
                 st.session_state["brief"] = generate_brief.generate_brief(
 					tele_opt,
