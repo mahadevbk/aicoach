@@ -1684,7 +1684,7 @@ with tab3:
             ret, frame = cap.read()
             cap.release()
             if ret:
-                st.image(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB), caption=f"PREVIEW: FRAME {impact_f}", use_container_width=True)
+                st.image(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB), caption=f"PREVIEW: FRAME {impact_f}", width="stretch")
                 
             slow_mo_output = os.path.join(tempfile.gettempdir(), f"replay_{int(time.time())}.mp4")
 
