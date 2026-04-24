@@ -39,38 +39,51 @@ def apply_impact_slow_mo(input_path, output_path, impact_frame, fps):
     Normal speed -> Slow at impact -> Normal speed (with smooth transitions)
     """
     import subprocess
-    import math
     
     # Convert impact frame to seconds
     t_impact = impact_frame / fps
     
     # Define the slow-motion window
-    ramp_duration = 2.0  # 2 seconds total (1 before, 1 after impact)
+    ramp_duration = 1.0  # ±1 second around impact
     slowdown_factor = 4.0  # 0.25x speed = 4x time stretching
     
-    # Create smooth cosine ramp: slows down at impact, speeds up after
-    # This creates: normal -> slow -> normal with smooth transitions
-    filter_expr = (
-        f"setpts='(T + {slowdown_factor} * max(0, 1 - abs(T - {t_impact}) / {ramp_duration / 2}))/(1 + {slowdown_factor})/TB',"
-        f"minterpolate=fps=60:mi_mode=mci"
-    )
-    
     debug_msg = f"""
-=== SMOOTH SLOW-MO WITH MINTERPOLATE ===
-Input: {input_path}
-Impact Frame: {impact_frame} @ {t_impact:.2f}s
+=== MINTERPOLATE SLOW-MO ===
+Input Video: {input_path}
+Impact Frame: {impact_frame}
 FPS: {fps}
+Impact Time (T): {t_impact:.3f} seconds
 
-Speed Control:
-- Ramp duration: ±{ramp_duration/2:.1f}s around impact
-- Slowdown factor: {slowdown_factor}x (= 0.25x playback speed)
-- Interpolation: 60fps with mci mode
+Ramp Configuration:
+- Window: {t_impact - ramp_duration:.3f}s to {t_impact + ramp_duration:.3f}s
+- Slowdown: 4x stretching = 0.25x playback speed
+- Interpolation: minterpolate at 60fps
 
-Filter: Cosine curve speed adjustment + frame interpolation
-Time window: {t_impact - ramp_duration/2:.2f}s to {t_impact + ramp_duration/2:.2f}s
+Formula:
+  Speed = 1 + 3*max(0, 1 - abs(T - {t_impact:.3f})/{ramp_duration})
+  - At T={t_impact:.3f}s: Speed will be slowest
+  - Away from impact: Speed returns to normal
+
+setpts filter will:
+1. REMAP TIMESTAMPS to slow down near impact
+2. minterpolate CREATES FRAMES at 60fps for smooth playback
 """
     
     try:
+        # Create the setpts filter
+        # This maps: normal at start → slow at impact → normal at end
+        filter_expr = (
+            f"setpts='if(gte(T\\,{t_impact - ramp_duration})*lte(T\\,{t_impact + ramp_duration}), "
+            f"(T-{t_impact - ramp_duration})*4+{t_impact - ramp_duration}, T)/TB',"
+            f"minterpolate=fps=60:mi_mode=mci"
+        )
+        
+        debug_msg += f"\nFFmpeg Command:\n"
+        debug_msg += f"ffmpeg -i {input_path}\n"
+        debug_msg += f"  -vf \"{filter_expr}\"\n"
+        debug_msg += f"  -c:v libx264 -preset fast -crf 23\n"
+        debug_msg += f"  {output_path}\n"
+        
         cmd = [
             'ffmpeg', '-y', '-i', input_path,
             '-vf', filter_expr,
@@ -80,10 +93,10 @@ Time window: {t_impact - ramp_duration/2:.2f}s to {t_impact + ramp_duration/2:.2
         
         result = subprocess.run(cmd, capture_output=True, text=True)
         if result.returncode != 0:
-            debug_msg += f"\n✗ FFmpeg Error:\n{result.stderr[-500:]}"
+            debug_msg += f"\n✗ FFmpeg Error:\n{result.stderr[-300:]}"
             raise Exception(f"FFmpeg error: {result.stderr[-300:]}")
         
-        debug_msg += f"\n✓ Successfully created smooth slow-mo video with frame interpolation\n"
+        debug_msg += f"\n✓ SUCCESS - Smooth slow-mo video created\n"
         return output_path, debug_msg
         
     except Exception as e:
@@ -1716,6 +1729,13 @@ with tab3:
             # Extract impact frame and FPS
             impact_f = st.session_state["event_snapshot"].get("frame_number", 0)
             fps = st.session_state["tele_opt"]["metadata"].get("fps", 30)
+            
+            # DEBUG: Show what values we're using
+            col1, col2 = st.columns(2)
+            with col1:
+                st.metric("Impact Frame", impact_f)
+            with col2:
+                st.metric("Video FPS", fps)
             
             # Define paths
             input_vid = st.session_state["final_video"]  # Use the actual final video
