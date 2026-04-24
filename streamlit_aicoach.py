@@ -36,10 +36,10 @@ THIN_JOINT_SPEC = (0, 255, 0)  # Bright Neon Green
 THIN_BONE_SPEC = (255, 255, 255) # Pure White
 
 def apply_advanced_slow_mo(input_path, output_path, impact_frame, fps):
-    \"\"\"
+    """
     Creates a smooth ramped slow-mo: 1x -> 0.2x -> 1x.
     Uses minterpolate for high-quality frame synthesis.
-    \"\"\"
+    """
     t_impact = impact_frame / fps
     t_start = max(0, t_impact - 0.5)
     t_end = t_impact + 0.5
@@ -47,15 +47,15 @@ def apply_advanced_slow_mo(input_path, output_path, impact_frame, fps):
     # 1s window centered on impact at 0.2x speed (5x PTS)
     # This adds 4 seconds to the total duration.
     filter_script = (
-        f\"setpts='if(lt(T,{t_start}), T, \"
-        f\"if(lt(T,{t_end}), {t_start}+(T-{t_start})*5, \"
-        f\"T+4))'\"
+        f"setpts='if(lt(T,{t_start}), T, "
+        f"if(lt(T,{t_end}), {t_start}+(T-{t_start})*5, "
+        f"T+4))'"
     )
     
     # Apply speed change and then interpolate to 60fps for buttery smooth motion
     cmd = [
         'ffmpeg', '-y', '-i', input_path,
-        '-filter:v', f\"{filter_script},minterpolate=fps=60:mi_mode=mci:mc_mode=aobmc:me_mode=bidir:vsfm=1\",
+        '-filter:v', f"{filter_script},minterpolate=fps=60:mi_mode=mci:mc_mode=aobmc:me_mode=bidir:vsfm=1",
         '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-preset', 'ultrafast',
         output_path
     ]
