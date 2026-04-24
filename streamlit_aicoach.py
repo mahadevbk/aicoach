@@ -1619,16 +1619,22 @@ with tab2:
             st.success("✅ BIOMECHANICAL RENDER COMPLETE! PLEASE PROCEED TO THE 'RESULTS' TAB ABOVE.")
 
 # Tab 3: Results
+# ============================================================================
+# UPDATED TAB 3: PERFORMANCE ANALYSIS & REPLAY
+# ============================================================================
+
 with tab3:
     if "final_video" not in st.session_state:
         st.warning("⚠️ COMPLETE THE SYNCHRONIZATION AND RENDER FIRST.")
     else:
         s = st.session_state["data_current"]
         sport, action = st.session_state["sport"], st.session_state["action"]
+        
         st.markdown("#### PERFORMANCE ANALYSIS", unsafe_allow_html=True)
         st.video(st.session_state["final_video"])
         
         st.markdown("#### PRO ANALYTICS DASHBOARD")
+        # Keep your existing metrics logic intact
         metrics = get_ai_metrics(s['d1']['raw'], s['d1']['fps'])
         if metrics:
             kpis = generate_sport_kpis(metrics, sport, s['d1']['raw'])
@@ -1649,7 +1655,6 @@ with tab3:
             
             # --- DOWNLOADS & EXPORTS ---
             st.markdown("#### DOWNLOADS & EXPORT")
-            
             z_buf = io.BytesIO()
             with zipfile.ZipFile(z_buf, "w") as zf:
                 zf.write(st.session_state["final_video"], "analysis.mp4")
@@ -1679,7 +1684,6 @@ with tab3:
                 st.markdown("#### EXPORT DOCUMENTS")
                 c1, c2 = st.columns(2)
                 hand = st.session_state["tele_opt"]["metadata"].get("dominant_side", "unknown")
-                
                 with c1:
                     docx_f = create_docx_report(st.session_state["report_text"], sport, action, hand)
                     st.download_button("📄 WORD DOC", docx_f, f"{sport}_ANALYSIS.docx", width="stretch")
@@ -1687,48 +1691,57 @@ with tab3:
                     pdf_f = create_pdf_report(st.session_state["report_text"], sport, action, hand)
                     st.download_button("📜 PDF REPORT", pdf_f, f"{sport}_ANALYSIS.pdf", width="stretch")
                     
-        # --- PART 2: UPDATED IMPACT REPLAY RENDER ---
+        # ====================================================================
+        # PART 2: VISUAL IMPACT REPLAY RENDERER (SCRUBBER CONNECTED)
+        # ====================================================================
         if "tele_opt" in st.session_state:
             st.markdown("---")
-            st.markdown("### 🎥 IMPACT REPLAY (0.25x SLOW-MO)")
+            st.markdown("### 🎥 IMPACT REPLAY SETUP")
+            st.info("Scrub the slider to find the exact impact frame in the preview below.")
             
-            # Extract basic data
             fps = st.session_state["tele_opt"]["metadata"].get("fps", 30)
-            total_frames = st.session_state.get("total_frames", 300)
+            input_vid = st.session_state["final_video"]
             
-            # Default to AI detected frame, but let user slide to correct it
+            # Use OpenCV to get total frame count for the slider
+            cap = cv2.VideoCapture(input_vid)
+            total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+            
+            # Get default detected impact
             detected_f = st.session_state.get("event_snapshot", {}).get("frame_number", 0)
             
-            # Manual Confirmation Slider
-            impact_f = st.slider("MANUALLY CONFIRM IMPACT FRAME", 0, total_frames, int(detected_f))
+            # --- THE SCRUBBER ---
+            impact_f = st.slider("SCRUB TO FIND IMPACT FRAME", 0, total_frames - 1, int(detected_f))
             
-            col1, col2 = st.columns(2)
-            with col1:
-                st.metric("Confirmed Frame", impact_f)
-            with col2:
-                st.metric("Video FPS", fps)
+            # --- THE PREVIEW WINDOW ---
+            # This connects the slider visually to the video
+            cap.set(cv2.CAP_PROP_POS_FRAMES, impact_f)
+            ret, frame = cap.read()
+            if ret:
+                frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                st.image(frame_rgb, caption=f"Previewing Frame: {impact_f}", use_container_width=True)
+            cap.release()
             
-            input_vid = st.session_state["final_video"]
             slow_mo_output = "impact_replay.mp4"
 
-            # Button to trigger/re-trigger the render
-            if st.button("🎬 RENDER / REFRESH REPLAY"):
-                # Force re-render if user changed the frame
+            # Render Button
+            if st.button("🎬 RENDER SLOW-MO REPLAY", type="secondary"):
+                # Clean old file to force new render with current impact_f
                 if os.path.exists(slow_mo_output):
                     os.remove(slow_mo_output)
                 
-                with st.spinner(f"🎬 RENDERING SLOW-MO AT FRAME {impact_f}..."):
+                with st.spinner(f"🎬 RENDERING 0.25x SLOW-MO AROUND FRAME {impact_f}..."):
                     try:
+                        # This function must use the 'sandwich' FFmpeg filter
                         result = apply_impact_slow_mo(input_vid, slow_mo_output, impact_f, fps)
-                        # Ensure we show the video immediately after rendering
-                        st.rerun()
+                        st.rerun() # Refresh to show new video
                     except Exception as e:
                         st.error(f"Replay Rendering Error: {e}")
 
-            # Display the video only if it exists
+            # Final Replay Display
             if os.path.exists(slow_mo_output):
+                st.markdown("#### ✅ GENERATED REPLAY")
                 st.video(slow_mo_output)
-                st.caption(f"✅ Replay centered on frame {impact_f}. (Regular -> 0.25x -> Regular)")
+                st.caption(f"Replay centered on frame {impact_f} (Speed: 1x ➔ 0.25x ➔ 1x)")
 
         st.markdown("---")
         if st.button("↺ ANALYZE ANOTHER VIDEO", width="stretch"):
