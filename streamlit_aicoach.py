@@ -34,205 +34,57 @@ class NumpyEncoder(json.JSONEncoder):
 
 def apply_impact_slow_mo(input_path, output_path, impact_frame, fps):
     """
-    Apply speed ramp: normal (1x) -> slow (0.25x) at impact -> normal (1x).
-    Creates a smooth ramp with 5 segments for proper timing:
-    1. Before impact (normal speed)
-    2. Ramp down to slow (0.5x speed over 0.5s)
-    3. At impact (0.25x speed - holds for impact moment)
-    4. Ramp up to normal (0.5x back to 1x over 0.5s)
-    5. After impact (normal speed)
+    Apply speed ramp using FFmpeg's setpts filter in a single pass.
+    Normal speed -> Slow at impact -> Normal speed
     """
     import subprocess
     
-    # Convert frame number to seconds
+    # Impact time in seconds
     t_impact = impact_frame / fps
     
-    # Define timing windows
-    ramp_down_duration = 0.5  # 0.5 seconds to ramp down
-    impact_duration = 0.5     # 0.5 seconds at slow speed
-    ramp_up_duration = 0.5    # 0.5 seconds to ramp back up
+    # Window: 1 second before impact to 1 second after
+    t_start = max(0, t_impact - 1.0)
+    t_end = t_impact + 1.0
     
-    # Time boundaries
-    t_ramp_down_start = max(0, t_impact - ramp_down_duration)
-    t_impact_start = t_impact
-    t_impact_end = t_impact + impact_duration
-    t_ramp_up_end = t_impact_end + ramp_up_duration
+    # Create filter that:
+    # - Normal (1x) before t_start
+    # - Slowed (0.25x) from t_start to t_end  
+    # - Normal (1x) after t_end
+    filter_script = (
+        f"setpts='if(lt(T,{t_start}), T, "
+        f"if(lt(T,{t_end}), {t_start}+(T-{t_start})*4, "
+        f"T+3))'"
+    )
     
-    # Convert to frame numbers
-    f_ramp_down_start = max(0, int(t_ramp_down_start * fps))
-    f_impact_start = int(t_impact_start * fps)
-    f_impact_end = int(t_impact_end * fps)
-    f_ramp_up_end = int(t_ramp_up_end * fps)
-    
-    # DEBUG OUTPUT to file for logging
     debug_msg = f"""
-=== SLOW-MO DEBUG INFO ===
-Input video: {input_path}
-Impact frame: {impact_frame}, FPS: {fps}
-t_impact: {t_impact:.2f}s
+=== SLOW-MO TIMING ===
+Video: {input_path}
+Impact Frame: {impact_frame} (@ {t_impact:.2f}s)
+Slow-mo Window: {t_start:.2f}s to {t_end:.2f}s
+FPS: {fps}
 
-Time boundaries:
-  t_ramp_down_start: {t_ramp_down_start:.2f}s
-  t_impact_start:    {t_impact_start:.2f}s
-  t_impact_end:      {t_impact_end:.2f}s
-  t_ramp_up_end:     {t_ramp_up_end:.2f}s
-
-Frame boundaries:
-  f_ramp_down_start: {f_ramp_down_start}
-  f_impact_start:    {f_impact_start}
-  f_impact_end:      {f_impact_end}
-  f_ramp_up_end:     {f_ramp_up_end}
+Filter: setpts with 0.25x slowdown at impact
 """
     
-    temp_files = []
-    concat_file = "concat_list.txt"
-    
     try:
-        # Get total frame count
-        probe_cmd = [
-            'ffprobe', '-v', 'error', 
-            '-select_streams', 'v:0',
-            '-show_entries', 'stream=nb_frames,r_frame_rate',
-            '-of', 'default=noprint_wrappers=1:nokey=1:noescaped=1',
-            input_path
-        ]
-        probe_result = subprocess.run(probe_cmd, capture_output=True, text=True)
-        probe_output = probe_result.stdout.strip().split('\n')
-        total_frames = int(float(probe_output[0])) if probe_output[0] else 10000
-        
-        debug_msg += f"\nTotal frames in video: {total_frames}\n"
-        
-        # Ensure frame boundaries are valid
-        f_impact_end = min(f_impact_end, total_frames - 1)
-        f_ramp_up_end = min(f_ramp_up_end, total_frames - 1)
-        
-        # SEGMENT 1: Normal speed BEFORE ramp down starts
-        temp_seg1 = "temp_seg1.mp4"
-        temp_files.append(temp_seg1)
-        if f_ramp_down_start > 0:
-            debug_msg += f"\nSegment 1: Frames 0 to {f_ramp_down_start} (NORMAL 1x speed)\n"
-            cmd_seg1 = [
-                'ffmpeg', '-y', '-i', input_path,
-                '-vf', f'select=lt(n\\,{f_ramp_down_start}),setpts=PTS-STARTPTS',
-                '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '23',
-                temp_seg1
-            ]
-            result = subprocess.run(cmd_seg1, capture_output=True, text=True)
-            if result.returncode != 0:
-                raise Exception(f"Segment 1 error: {result.stderr[-300:]}")
-        else:
-            debug_msg += f"\nSegment 1: SKIPPED (starts at frame 0)\n"
-        
-        # SEGMENT 2: Ramp down to 0.5x
-        temp_seg2 = "temp_seg2.mp4"
-        temp_files.append(temp_seg2)
-        if f_impact_start > f_ramp_down_start:
-            debug_msg += f"Segment 2: Frames {f_ramp_down_start} to {f_impact_start} (RAMP DOWN to 0.5x speed)\n"
-            cmd_seg2 = [
-                'ffmpeg', '-y', '-i', input_path,
-                '-vf', f'select=gte(n\\,{f_ramp_down_start})*lt(n\\,{f_impact_start}),setpts=2*PTS-STARTPTS',
-                '-af', f'aselect=gte(t\\,{t_ramp_down_start})*lt(t\\,{t_impact_start}),asetpts=2*PTS-STARTPTS,atempo=0.5',
-                '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '23',
-                temp_seg2
-            ]
-            result = subprocess.run(cmd_seg2, capture_output=True, text=True)
-            if result.returncode != 0:
-                raise Exception(f"Segment 2 error: {result.stderr[-300:]}")
-        else:
-            debug_msg += f"Segment 2: SKIPPED (no ramp window)\n"
-        
-        # SEGMENT 3: SLOWEST 0.25x AT IMPACT
-        temp_seg3 = "temp_seg3.mp4"
-        temp_files.append(temp_seg3)
-        if f_impact_end > f_impact_start:
-            debug_msg += f"Segment 3: Frames {f_impact_start} to {f_impact_end} (🔴 SLOWEST 0.25x AT IMPACT)\n"
-            cmd_seg3 = [
-                'ffmpeg', '-y', '-i', input_path,
-                '-vf', f'select=gte(n\\,{f_impact_start})*lt(n\\,{f_impact_end}),setpts=4*PTS-STARTPTS',
-                '-af', f'aselect=gte(t\\,{t_impact_start})*lt(t\\,{t_impact_end}),asetpts=4*PTS-STARTPTS,atempo=0.25',
-                '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '23',
-                temp_seg3
-            ]
-            result = subprocess.run(cmd_seg3, capture_output=True, text=True)
-            if result.returncode != 0:
-                raise Exception(f"Segment 3 error: {result.stderr[-300:]}")
-        else:
-            debug_msg += f"Segment 3: ERROR - Impact window is empty!\n"
-        
-        # SEGMENT 4: Ramp up to 0.5x
-        temp_seg4 = "temp_seg4.mp4"
-        temp_files.append(temp_seg4)
-        if f_ramp_up_end > f_impact_end:
-            debug_msg += f"Segment 4: Frames {f_impact_end} to {f_ramp_up_end} (RAMP UP to 0.5x speed)\n"
-            cmd_seg4 = [
-                'ffmpeg', '-y', '-i', input_path,
-                '-vf', f'select=gte(n\\,{f_impact_end})*lt(n\\,{f_ramp_up_end}),setpts=2*PTS-STARTPTS',
-                '-af', f'aselect=gte(t\\,{t_impact_end})*lt(t\\,{t_ramp_up_end}),asetpts=2*PTS-STARTPTS,atempo=0.5',
-                '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '23',
-                temp_seg4
-            ]
-            result = subprocess.run(cmd_seg4, capture_output=True, text=True)
-            if result.returncode != 0:
-                raise Exception(f"Segment 4 error: {result.stderr[-300:]}")
-        else:
-            debug_msg += f"Segment 4: SKIPPED (no ramp window)\n"
-        
-        # SEGMENT 5: Normal speed AFTER ramp up ends
-        temp_seg5 = "temp_seg5.mp4"
-        temp_files.append(temp_seg5)
-        if total_frames > f_ramp_up_end:
-            debug_msg += f"Segment 5: Frames {f_ramp_up_end} to {total_frames} (NORMAL 1x speed)\n"
-            cmd_seg5 = [
-                'ffmpeg', '-y', '-i', input_path,
-                '-vf', f'select=gte(n\\,{f_ramp_up_end}),setpts=PTS-STARTPTS',
-                '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '23',
-                temp_seg5
-            ]
-            result = subprocess.run(cmd_seg5, capture_output=True, text=True)
-            if result.returncode != 0:
-                raise Exception(f"Segment 5 error: {result.stderr[-300:]}")
-        else:
-            debug_msg += f"Segment 5: SKIPPED (ends at frame {f_ramp_up_end})\n"
-        
-        # Concatenate all segments
-        debug_msg += f"\nConcatenating segments...\n"
-        with open(concat_file, 'w') as f:
-            f.write(f"file '{temp_seg1}'\n")
-            f.write(f"file '{temp_seg2}'\n")
-            f.write(f"file '{temp_seg3}'\n")
-            f.write(f"file '{temp_seg4}'\n")
-            f.write(f"file '{temp_seg5}'\n")
-        
-        cmd_concat = [
-            'ffmpeg', '-y', '-f', 'concat', '-safe', '0',
-            '-i', concat_file,
-            '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '23',
+        cmd = [
+            'ffmpeg', '-y', '-i', input_path,
+            '-vf', filter_script,
+            '-c:v', 'libx264', '-preset', 'fast', '-crf', '23',
             '-c:a', 'aac',
             output_path
         ]
-        result = subprocess.run(cmd_concat, capture_output=True, text=True)
+        
+        result = subprocess.run(cmd, capture_output=True, text=True)
         if result.returncode != 0:
-            raise Exception(f"Concat error: {result.stderr[-300:]}")
+            debug_msg += f"\nFFmpeg Error: {result.stderr[-500:]}"
+            raise Exception(f"FFmpeg error: {result.stderr[-300:]}")
         
-        debug_msg += f"✓ Created final slow-mo video: {output_path}\n"
-        
-        # Clean up all temp files
-        if os.path.exists(concat_file):
-            os.remove(concat_file)
-        for temp_file in temp_files:
-            if os.path.exists(temp_file):
-                os.remove(temp_file)
-        
-        # Store debug message in session for display
+        debug_msg += f"\n✓ Successfully created slow-mo video"
         return output_path, debug_msg
-                
+        
     except Exception as e:
-        # Clean up on error
-        if os.path.exists(concat_file):
-            os.remove(concat_file)
-        for temp_file in temp_files:
-            if os.path.exists(temp_file):
-                os.remove(temp_file)
+        debug_msg += f"\n✗ Error: {str(e)}"
         raise
 
 
