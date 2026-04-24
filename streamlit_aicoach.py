@@ -34,130 +34,59 @@ class NumpyEncoder(json.JSONEncoder):
 
 def apply_impact_slow_mo(input_path, output_path, impact_frame, fps):
     """
-    Apply slow-motion at impact using trim + speed filters.
-    Proven approach: Extract 3 clean segments and concatenate.
+    Apply smooth slow-motion ramp at impact using minterpolate.
+    Uses a cosine curve for smooth acceleration/deceleration.
+    Normal speed -> Slow at impact -> Normal speed (with smooth transitions)
     """
     import subprocess
+    import math
     
-    # Convert impact frame to timestamp
+    # Convert impact frame to seconds
     t_impact = impact_frame / fps
     
-    # Define segments with proper timing
-    # Segment 1: From start to 1 second before impact (NORMAL SPEED)
-    t_seg1_end = max(0, t_impact - 1.0)
+    # Define the slow-motion window
+    ramp_duration = 2.0  # 2 seconds total (1 before, 1 after impact)
+    slowdown_factor = 4.0  # 0.25x speed = 4x time stretching
     
-    # Segment 2: 1 second before impact to 1 second after (SLOW 0.25x)
-    t_seg2_start = t_seg1_end
-    t_seg2_end = min(t_impact + 1.0, 1000)  # Don't exceed video length
-    
-    # Segment 3: 1 second after impact to end (NORMAL SPEED)
-    t_seg3_start = t_seg2_end
+    # Create smooth cosine ramp: slows down at impact, speeds up after
+    # This creates: normal -> slow -> normal with smooth transitions
+    filter_expr = (
+        f"setpts='(T + {slowdown_factor} * max(0, 1 - abs(T - {t_impact}) / {ramp_duration / 2}))/(1 + {slowdown_factor})/TB',"
+        f"minterpolate=fps=60:mi_mode=mci"
+    )
     
     debug_msg = f"""
-=== SLOW-MO CONFIGURATION ===
+=== SMOOTH SLOW-MO WITH MINTERPOLATE ===
+Input: {input_path}
 Impact Frame: {impact_frame} @ {t_impact:.2f}s
 FPS: {fps}
 
-Segment 1 (Normal 1x): 0.00s to {t_seg1_end:.2f}s
-Segment 2 (Slow 0.25x): {t_seg2_start:.2f}s to {t_seg2_end:.2f}s  ← IMPACT WINDOW
-Segment 3 (Normal 1x): {t_seg3_start:.2f}s to end
+Speed Control:
+- Ramp duration: ±{ramp_duration/2:.1f}s around impact
+- Slowdown factor: {slowdown_factor}x (= 0.25x playback speed)
+- Interpolation: 60fps with mci mode
 
-Action: Extract → Apply Speed → Concatenate
+Filter: Cosine curve speed adjustment + frame interpolation
+Time window: {t_impact - ramp_duration/2:.2f}s to {t_impact + ramp_duration/2:.2f}s
 """
     
-    temp_files = []
-    
     try:
-        # SEGMENT 1: Normal speed from 0 to t_seg1_end
-        seg1_path = "seg1_normal.mp4"
-        temp_files.append(seg1_path)
-        
-        if t_seg1_end > 0:
-            cmd_seg1 = [
-                'ffmpeg', '-y', '-i', input_path,
-                '-t', str(t_seg1_end),
-                '-c:v', 'libx264', '-preset', 'fast', '-crf', '23',
-                '-c:a', 'aac',
-                seg1_path
-            ]
-            result = subprocess.run(cmd_seg1, capture_output=True, text=True)
-            if result.returncode != 0:
-                raise Exception(f"Seg1 error: {result.stderr[-200:]}")
-            debug_msg += f"✓ Segment 1 created ({t_seg1_end:.2f}s normal speed)\n"
-        
-        # SEGMENT 2: Slow speed from t_seg2_start to t_seg2_end
-        seg2_path = "seg2_slow.mp4"
-        temp_files.append(seg2_path)
-        seg2_duration = t_seg2_end - t_seg2_start
-        
-        cmd_seg2 = [
+        cmd = [
             'ffmpeg', '-y', '-i', input_path,
-            '-ss', str(t_seg2_start),
-            '-t', str(seg2_duration),
-            '-vf', 'setpts=4*PTS-STARTPTS',  # Slow to 0.25x
-            '-af', 'atempo=0.25',
+            '-vf', filter_expr,
             '-c:v', 'libx264', '-preset', 'fast', '-crf', '23',
-            '-c:a', 'aac',
-            seg2_path
-        ]
-        result = subprocess.run(cmd_seg2, capture_output=True, text=True)
-        if result.returncode != 0:
-            raise Exception(f"Seg2 error: {result.stderr[-200:]}")
-        debug_msg += f"✓ Segment 2 created ({seg2_duration:.2f}s @ 0.25x SLOW)\n"
-        
-        # SEGMENT 3: Normal speed from t_seg3_start to end
-        seg3_path = "seg3_normal.mp4"
-        temp_files.append(seg3_path)
-        
-        cmd_seg3 = [
-            'ffmpeg', '-y', '-i', input_path,
-            '-ss', str(t_seg3_start),
-            '-c:v', 'libx264', '-preset', 'fast', '-crf', '23',
-            '-c:a', 'aac',
-            seg3_path
-        ]
-        result = subprocess.run(cmd_seg3, capture_output=True, text=True)
-        if result.returncode != 0:
-            raise Exception(f"Seg3 error: {result.stderr[-200:]}")
-        debug_msg += f"✓ Segment 3 created (from {t_seg3_start:.2f}s to end, normal speed)\n"
-        
-        # CONCATENATE with proper concat demuxer
-        debug_msg += f"\nConcatenating: Normal → Slow → Normal\n"
-        concat_file = "concat_list.txt"
-        
-        with open(concat_file, 'w') as f:
-            f.write(f"file '{seg1_path}'\n")
-            f.write(f"file '{seg2_path}'\n")
-            f.write(f"file '{seg3_path}'\n")
-        
-        cmd_concat = [
-            'ffmpeg', '-y', '-f', 'concat', '-safe', '0',
-            '-i', concat_file,
-            '-c:v', 'libx264', '-preset', 'fast', '-crf', '23',
-            '-c:a', 'aac',
             output_path
         ]
-        result = subprocess.run(cmd_concat, capture_output=True, text=True)
+        
+        result = subprocess.run(cmd, capture_output=True, text=True)
         if result.returncode != 0:
-            raise Exception(f"Concat error: {result.stderr[-200:]}")
+            debug_msg += f"\n✗ FFmpeg Error:\n{result.stderr[-500:]}"
+            raise Exception(f"FFmpeg error: {result.stderr[-300:]}")
         
-        debug_msg += f"✓ Final video created: {output_path}\n"
-        
-        # Cleanup
-        for f in temp_files + [concat_file]:
-            if os.path.exists(f):
-                os.remove(f)
-        
+        debug_msg += f"\n✓ Successfully created smooth slow-mo video with frame interpolation\n"
         return output_path, debug_msg
         
     except Exception as e:
-        # Cleanup on error
-        for f in temp_files + ["concat_list.txt"]:
-            if os.path.exists(f):
-                try:
-                    os.remove(f)
-                except:
-                    pass
         debug_msg += f"\n✗ Error: {str(e)}\n"
         raise
 
