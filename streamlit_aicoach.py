@@ -37,36 +37,48 @@ THIN_BONE_SPEC = (255, 255, 255) # Pure White
 
 def apply_advanced_slow_mo(input_path, output_path, impact_frame, fps):
     """
-    Creates a smooth ramped slow-mo: 1x -> 0.2x -> 1x.
-    Includes a fallback if minterpolate fails.
+    Creates a smooth ramped slow-mo using segment-based processing.
+    More robust than single-pass setpts for long or complex videos.
     """
+    import subprocess
+    
+    # Calculate timestamps
     t_impact = impact_frame / fps
     t_start = max(0, t_impact - 0.5)
     t_end = t_impact + 0.5
     
-    # 1s window at 0.2x speed (5x PTS) adds 4s to total length
-    filter_script = (
-        f"setpts='if(lt(T,{t_start}), T, "
-        f"if(lt(T,{t_end}), {t_start}+(T-{t_start})*5, "
-        f"T+4))'"
+    # Complex filter: split into 3 parts, slow down middle part, then concat
+    # We use minterpolate ONLY on the middle part to save resources and ensure stability
+    filter_complex = (
+        f"[0:v]trim=start=0:end={t_start},setpts=PTS-STARTPTS,fps=60[v1]; "
+        f"[0:v]trim=start={t_start}:end={t_end},setpts=5*(PTS-STARTPTS),minterpolate=fps=60:mi_mode=mci:mc_mode=obmc:me_mode=bidir[v2]; "
+        f"[0:v]trim=start={t_end},setpts=PTS-STARTPTS,fps=60[v3]; "
+        f"[v1][v2][v3]concat=n=3:v=1:a=0[outv]"
     )
     
-    # Robust interpolation: force 60fps duplicates THEN interpolate
     cmd = [
         'ffmpeg', '-y', '-i', input_path,
-        '-filter:v', f"{filter_script},fps=60,minterpolate=mi_mode=mci:mc_mode=obmc:me_mode=bidir",
-        '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-preset', 'ultrafast', '-crf', '23',
+        '-filter_complex', filter_complex,
+        '-map', '[outv]',
+        '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-preset', 'ultrafast', '-crf', '20',
+        '-movflags', '+faststart',
         output_path
     ]
     
-    import subprocess
     try:
         subprocess.run(cmd, check=True, capture_output=True, text=True)
     except subprocess.CalledProcessError as e:
-        # Fallback to basic frame duplication if motion interpolation fails
+        # Fallback to simple frame duplication if minterpolate fails
+        fallback_filter = (
+            f"[0:v]trim=start=0:end={t_start},setpts=PTS-STARTPTS,fps=60[v1]; "
+            f"[0:v]trim=start={t_start}:end={t_end},setpts=5*(PTS-STARTPTS),fps=60[v2]; "
+            f"[0:v]trim=start={t_end},setpts=PTS-STARTPTS,fps=60[v3]; "
+            f"[v1][v2][v3]concat=n=3:v=1:a=0[outv]"
+        )
         cmd_fallback = [
             'ffmpeg', '-y', '-i', input_path,
-            '-filter:v', f"{filter_script},fps=60",
+            '-filter_complex', fallback_filter,
+            '-map', '[outv]',
             '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-preset', 'ultrafast',
             output_path
         ]
@@ -1212,24 +1224,29 @@ def analyze_vid(path, model):
 def draw_neon_skeleton(img, lms, alpha=0.8):
     if not lms: return
     overlay = img.copy()
-    # Finer, more specific skeletal structure
+    # High-detail skeletal structure including hands and feet
     FULL_SKELETON = [
         (11,12), (11,13), (13,15), (12,14), (14,16), # Shoulders and arms
+        (15,17), (15,19), (15,21), (17,19), # Left hand
+        (16,18), (16,20), (16,22), (18,20), # Right hand
         (11,23), (12,24), (23,24), # Torso
-        (23,25), (25,27), (24,26), (26,28) # Legs
+        (23,25), (25,27), (24,26), (26,28), # Legs
+        (27,29), (27,31), (29,31), # Left foot
+        (28,30), (28,32), (30,32)  # Right foot
     ]
-    # Draw connections with a subtle dark glow for visibility on light backgrounds
+    # Draw connections with a dark outer glow for contrast
     for s, e in FULL_SKELETON:
         p1 = (int(lms[s].x*img.shape[1]), int(lms[s].y*img.shape[0]))
         p2 = (int(lms[e].x*img.shape[1]), int(lms[e].y*img.shape[0]))
-        cv2.line(overlay, p1, p2, (0, 0, 0), 2, cv2.LINE_AA) # Outer glow
-        cv2.line(overlay, p1, p2, (255, 255, 255), 1, cv2.LINE_AA) # Inner core
+        cv2.line(overlay, p1, p2, (0, 0, 0), 3, cv2.LINE_AA) # Outer glow
+        cv2.line(overlay, p1, p2, (255, 255, 255), 1, cv2.LINE_AA) # White core
     
     # Draw joints (Neon Green with White core)
-    for i in [11, 12, 13, 14, 15, 16, 23, 24, 25, 26, 27, 28]:
+    for i in range(11, 33):
         pt = (int(lms[i].x*img.shape[1]), int(lms[i].y*img.shape[0]))
-        cv2.circle(overlay, pt, 4, (0, 255, 0), -1, cv2.LINE_AA)
-        cv2.circle(overlay, pt, 2, (255, 255, 255), -1, cv2.LINE_AA)
+        cv2.circle(overlay, pt, 4, (0, 0, 0), -1, cv2.LINE_AA) # Border
+        cv2.circle(overlay, pt, 3, (0, 255, 0), -1, cv2.LINE_AA) # Green
+        cv2.circle(overlay, pt, 1, (255, 255, 255), -1, cv2.LINE_AA) # White core
         
     cv2.addWeighted(overlay, alpha, img, 1 - alpha, 0, img)
 
