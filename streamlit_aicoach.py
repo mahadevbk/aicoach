@@ -64,6 +64,22 @@ def apply_impact_slow_mo(input_path, output_path, impact_frame, fps):
     f_impact_end = int(t_impact_end * fps)
     f_ramp_up_end = int(t_ramp_up_end * fps)
     
+    # DEBUG OUTPUT
+    print(f"\n=== SLOW-MO DEBUG INFO ===")
+    print(f"Input video: {input_path}")
+    print(f"Impact frame: {impact_frame}, FPS: {fps}")
+    print(f"t_impact: {t_impact:.2f}s")
+    print(f"\nTime boundaries:")
+    print(f"  t_ramp_down_start: {t_ramp_down_start:.2f}s")
+    print(f"  t_impact_start:    {t_impact_start:.2f}s")
+    print(f"  t_impact_end:      {t_impact_end:.2f}s")
+    print(f"  t_ramp_up_end:     {t_ramp_up_end:.2f}s")
+    print(f"\nFrame boundaries:")
+    print(f"  f_ramp_down_start: {f_ramp_down_start}")
+    print(f"  f_impact_start:    {f_impact_start}")
+    print(f"  f_impact_end:      {f_impact_end}")
+    print(f"  f_ramp_up_end:     {f_ramp_up_end}")
+    
     temp_files = []
     try:
         # Get total frame count
@@ -78,6 +94,8 @@ def apply_impact_slow_mo(input_path, output_path, impact_frame, fps):
         probe_output = probe_result.stdout.strip().split('\n')
         total_frames = int(float(probe_output[0])) if probe_output[0] else 10000
         
+        print(f"\nTotal frames in video: {total_frames}")
+        
         # Ensure frame boundaries are valid
         f_impact_end = min(f_impact_end, total_frames - 1)
         f_ramp_up_end = min(f_ramp_up_end, total_frames - 1)
@@ -86,6 +104,7 @@ def apply_impact_slow_mo(input_path, output_path, impact_frame, fps):
         temp_seg1 = "temp_seg1.mp4"
         temp_files.append(temp_seg1)
         if f_ramp_down_start > 0:
+            print(f"\nSegment 1: Frames 0 to {f_ramp_down_start} (normal 1x speed)")
             cmd_seg1 = [
                 'ffmpeg', '-y', '-i', input_path,
                 '-vf', f'select=lt(n\\,{f_ramp_down_start}),setpts=PTS-STARTPTS',
@@ -95,11 +114,13 @@ def apply_impact_slow_mo(input_path, output_path, impact_frame, fps):
             result = subprocess.run(cmd_seg1, capture_output=True, text=True)
             if result.returncode != 0:
                 raise Exception(f"Segment 1 error: {result.stderr[-300:]}")
+            print(f"  ✓ Created {temp_seg1}")
         
         # Segment 2: Ramp down (0.5x speed: ramp_down_start to impact_start)
         temp_seg2 = "temp_seg2.mp4"
         temp_files.append(temp_seg2)
         if f_impact_start > f_ramp_down_start:
+            print(f"\nSegment 2: Frames {f_ramp_down_start} to {f_impact_start} (ramp down to 0.5x speed)")
             cmd_seg2 = [
                 'ffmpeg', '-y', '-i', input_path,
                 '-vf', f'select=gte(n\\,{f_ramp_down_start})*lt(n\\,{f_impact_start}),setpts=2*PTS-STARTPTS',
@@ -110,11 +131,13 @@ def apply_impact_slow_mo(input_path, output_path, impact_frame, fps):
             result = subprocess.run(cmd_seg2, capture_output=True, text=True)
             if result.returncode != 0:
                 raise Exception(f"Segment 2 error: {result.stderr[-300:]}")
+            print(f"  ✓ Created {temp_seg2}")
         
         # Segment 3: At impact (0.25x speed: impact_start to impact_end)
         temp_seg3 = "temp_seg3.mp4"
         temp_files.append(temp_seg3)
         if f_impact_end > f_impact_start:
+            print(f"\nSegment 3: Frames {f_impact_start} to {f_impact_end} (SLOWEST 0.25x at impact)")
             cmd_seg3 = [
                 'ffmpeg', '-y', '-i', input_path,
                 '-vf', f'select=gte(n\\,{f_impact_start})*lt(n\\,{f_impact_end}),setpts=4*PTS-STARTPTS',
@@ -125,11 +148,13 @@ def apply_impact_slow_mo(input_path, output_path, impact_frame, fps):
             result = subprocess.run(cmd_seg3, capture_output=True, text=True)
             if result.returncode != 0:
                 raise Exception(f"Segment 3 error: {result.stderr[-300:]}")
+            print(f"  ✓ Created {temp_seg3}")
         
         # Segment 4: Ramp up (0.5x speed: impact_end to ramp_up_end)
         temp_seg4 = "temp_seg4.mp4"
         temp_files.append(temp_seg4)
         if f_ramp_up_end > f_impact_end:
+            print(f"\nSegment 4: Frames {f_impact_end} to {f_ramp_up_end} (ramp up to 0.5x speed)")
             cmd_seg4 = [
                 'ffmpeg', '-y', '-i', input_path,
                 '-vf', f'select=gte(n\\,{f_impact_end})*lt(n\\,{f_ramp_up_end}),setpts=2*PTS-STARTPTS',
@@ -140,11 +165,13 @@ def apply_impact_slow_mo(input_path, output_path, impact_frame, fps):
             result = subprocess.run(cmd_seg4, capture_output=True, text=True)
             if result.returncode != 0:
                 raise Exception(f"Segment 4 error: {result.stderr[-300:]}")
+            print(f"  ✓ Created {temp_seg4}")
         
         # Segment 5: After ramp (normal speed: ramp_up_end to end)
         temp_seg5 = "temp_seg5.mp4"
         temp_files.append(temp_seg5)
         if total_frames > f_ramp_up_end:
+            print(f"\nSegment 5: Frames {f_ramp_up_end} to {total_frames} (normal 1x speed)")
             cmd_seg5 = [
                 'ffmpeg', '-y', '-i', input_path,
                 '-vf', f'select=gte(n\\,{f_ramp_up_end}),setpts=PTS-STARTPTS',
@@ -154,8 +181,10 @@ def apply_impact_slow_mo(input_path, output_path, impact_frame, fps):
             result = subprocess.run(cmd_seg5, capture_output=True, text=True)
             if result.returncode != 0:
                 raise Exception(f"Segment 5 error: {result.stderr[-300:]}")
+            print(f"  ✓ Created {temp_seg5}")
         
         # Concatenate all segments
+        print(f"\nConcatenating all segments...")
         concat_file = "concat_list.txt"
         with open(concat_file, 'w') as f:
             f.write(f"file '{temp_seg1}'\n")
@@ -174,6 +203,7 @@ def apply_impact_slow_mo(input_path, output_path, impact_frame, fps):
         result = subprocess.run(cmd_concat, capture_output=True, text=True)
         if result.returncode != 0:
             raise Exception(f"Concat error: {result.stderr[-300:]}")
+        print(f"✓ Created final slow-mo video: {output_path}\n")
         
         # Clean up all temp files
         if os.path.exists(concat_file):
