@@ -401,19 +401,36 @@ def create_docx_report(text, sport_name, action, hand):
     p_activity.add_run("Activity: ").bold = True
     p_activity.add_run(action)
     
-    # Add footer with disclaimer and page number
-    doc.add_page_number() # Adds page number to the footer
+    # Access the footer of the first section (assuming a single section document)
+    section = doc.sections[0]
+    footer = section.footer
     
-    # Access the footer and add disclaimer text
-    sections = doc.sections
-    for section in sections:
-        footer = section.footer
-        if footer:
-            p = footer.paragraphs[0] if footer.paragraphs else footer.add_paragraph()
-            run = p.add_run("Automated biomechanical analysis for educational use only. Consult a professional for clinical or medical assessment. ")
-            run.font.size = Pt(6) # Size 6 text
-            run.font.name = 'Arial'
+    # Add page number field and disclaimer text
+    # We add a paragraph to the footer for the disclaimer and page number.
+    footer_paragraph = footer.add_paragraph()
+    footer_paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER # Center align the footer text.
+    
+    # Add disclaimer text
+    run_disclaimer = footer_paragraph.add_run("Automated biomechanical analysis for educational use only. Consult a professional for clinical or medical assessment. ")
+    run_disclaimer.font.size = Pt(6) # Size 6 text
+    run_disclaimer.font.name = 'Arial'
+    
+    # Add page number field using its code representation for "Page X of Y" format
+    footer_paragraph.add_run(" | Page ") # Separator text
+    run_page_num_field = footer_paragraph.add_run()
+    run_page_num_field.add_field('PAGE') # Inserts the PAGE field code
+    run_page_num_field.font.size = Pt(6)
+    run_page_num_field.font.name = 'Arial'
+    
+    footer_paragraph.add_run(" of ")
+    run_total_pages_field = footer_paragraph.add_run()
+    run_total_pages_field.add_field('NUMPAGES') # Inserts the NUMPAGES field code
+    run_total_pages_field.font.size = Pt(6)
+    run_total_pages_field.font.name = 'Arial'
 
+    bio = io.BytesIO()
+    doc.save(bio)
+    return bio.getvalue()
     bio = io.BytesIO()
     doc.save(bio)
     return bio.getvalue()
