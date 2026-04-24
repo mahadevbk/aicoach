@@ -33,75 +33,51 @@ class NumpyEncoder(json.JSONEncoder):
         return super(NumpyEncoder, self).default(obj)
 
 def apply_impact_slow_mo(input_path, output_path, impact_frame, fps):
-    """
-    Apply smooth slow-motion ramp at impact using minterpolate.
-    Uses a cosine curve for smooth acceleration/deceleration.
-    Normal speed -> Slow at impact -> Normal speed (with smooth transitions)
-    """
     import subprocess
-    
-    # Convert impact frame to seconds
-    t_impact = impact_frame / fps
-    
-    # Define the slow-motion window
-    ramp_duration = 1.0  # ±1 second around impact
-    slowdown_factor = 4.0  # 0.25x speed = 4x time stretching
-    
-    debug_msg = f"""
-=== MINTERPOLATE SLOW-MO ===
-Input Video: {input_path}
-Impact Frame: {impact_frame}
-FPS: {fps}
-Impact Time (T): {t_impact:.3f} seconds
+    import shutil
 
-Ramp Configuration:
-- Window: {t_impact - ramp_duration:.3f}s to {t_impact + ramp_duration:.3f}s
-- Slowdown: 4x stretching = 0.25x playback speed
-- Interpolation: minterpolate at 60fps
-
-Formula:
-  Speed = 1 + 3*max(0, 1 - abs(T - {t_impact:.3f})/{ramp_duration})
-  - At T={t_impact:.3f}s: Speed will be slowest
-  - Away from impact: Speed returns to normal
-
-setpts filter will:
-1. REMAP TIMESTAMPS to slow down near impact
-2. minterpolate CREATES FRAMES at 60fps for smooth playback
-"""
-    
+    # Ensure impact_frame is a valid number
     try:
-        # Create the setpts filter
-        # This maps: normal at start → slow at impact → normal at end
-        filter_expr = (
-            f"setpts='if(gte(T\\,{t_impact - ramp_duration})*lte(T\\,{t_impact + ramp_duration}), "
-            f"(T-{t_impact - ramp_duration})*4+{t_impact - ramp_duration}, T)/TB',"
-            f"minterpolate=fps=60:mi_mode=mci"
-        )
-        
-        debug_msg += f"\nFFmpeg Command:\n"
-        debug_msg += f"ffmpeg -i {input_path}\n"
-        debug_msg += f"  -vf \"{filter_expr}\"\n"
-        debug_msg += f"  -c:v libx264 -preset fast -crf 23\n"
-        debug_msg += f"  {output_path}\n"
-        
-        cmd = [
-            'ffmpeg', '-y', '-i', input_path,
-            '-vf', filter_expr,
-            '-c:v', 'libx264', '-preset', 'fast', '-crf', '23',
-            output_path
-        ]
-        
-        result = subprocess.run(cmd, capture_output=True, text=True)
-        if result.returncode != 0:
-            debug_msg += f"\n✗ FFmpeg Error:\n{result.stderr[-300:]}"
-            raise Exception(f"FFmpeg error: {result.stderr[-300:]}")
-        
-        debug_msg += f"\n✓ SUCCESS - Smooth slow-mo video created\n"
-        return output_path, debug_msg
-        
+        impact_frame = float(impact_frame)
+    except:
+        impact_frame = 0
+
+    # Safety: If impact is at the start, just return the original video
+    if impact_frame <= 2:
+        shutil.copy(input_path, output_path)
+        return output_path, "Impact too close to start; skipped slow-mo."
+
+    t_impact = impact_frame / fps
+    slowdown = 4.0  # 0.25x speed
+    window = 1.0    # 1 second ramp window
+    
+    t1 = max(0, t_impact - window)
+    t2 = t_impact + window
+
+    # FFmpeg PTS Logic:
+    # 1. T < t1: Play at 1x speed
+    # 2. t1 < T < t2: Play at 0.25x speed (stretched timestamps)
+    # 3. T > t2: Play at 1x speed, but offset by the time added in stage 2
+    pts_expr = (
+        f"if(lt(T,{t1}), T, "
+        f"if(lt(T,{t2}), {t1}+(T-{t1})*{slowdown}, "
+        f"({t1}+({t2}-{t1})*{slowdown})+(T-{t2})))"
+    )
+    
+    filter_expr = f"setpts='({pts_expr})/TB',minterpolate=fps=60:mi_mode=mci"
+
+    cmd = [
+        'ffmpeg', '-y', '-i', input_path,
+        '-vf', filter_expr,
+        '-c:v', 'libx264', '-preset', 'fast', '-crf', '23',
+        output_path
+    ]
+
+    try:
+        subprocess.run(cmd, capture_output=True, text=True, check=True)
+        return output_path, f"Slow-mo centered at {t_impact:.2f}s"
     except Exception as e:
-        debug_msg += f"\n✗ Error: {str(e)}\n"
-        raise
+        return input_path, f"Error: {str(e)}"
 
 
 # ============================================================================
@@ -1674,7 +1650,6 @@ with tab3:
             # --- DOWNLOADS & EXPORTS ---
             st.markdown("#### DOWNLOADS & EXPORT")
             
-            # ZIP Download (Always available after render)
             z_buf = io.BytesIO()
             with zipfile.ZipFile(z_buf, "w") as zf:
                 zf.write(st.session_state["final_video"], "analysis.mp4")
@@ -1684,24 +1659,17 @@ with tab3:
             with cz1:
                 st.download_button("📥 DOWNLOAD ZIP (VIDEO + DATA)", z_buf.getvalue(), f"{sport}_DATA.zip", width="stretch")
             with cz2:
-                json_data = json.dumps(st.session_state["tele_opt"], indent=2, cls=NpEncoder)
+                json_data = json.dumps(st.session_state["tele_opt"], indent=2, cls=NumpyEncoder)
                 st.download_button("💾 RAW JSON", json_data, f"{sport}_TELEMETRY.json", "application/json", width="stretch")
             
             st.markdown("---")
-            # --- START OF SLOW-MOTION REPLAY RENDER ---
-            st.write(f"DEBUG: 'tele_opt' in session_state: {'tele_opt' in st.session_state}")
-            st.write(f"DEBUG: 'event_snapshot' in session_state: {'event_snapshot' in st.session_state}")
-            if "tele_opt" in st.session_state:
-                st.write(f"DEBUG: keys in tele_opt: {list(st.session_state['tele_opt'].keys())}")
-                st.write(f"DEBUG: 'event_snapshot' in tele_opt: {'event_snapshot' in st.session_state['tele_opt']}")
             
             if st.button("🤖 GENERATE AI COACHING REPORT", type="primary", width="stretch"):
                 with st.status("AI IS ANALYZING...") as status:
-                    #report_text = generate_pro_report(st.session_state["brief"])
                     report_text = generate_pro_report(
-                    st.session_state["brief"],
-                    sport=st.session_state["sport"],
-                    action=st.session_state["action"]
+                        st.session_state["brief"],
+                        sport=st.session_state["sport"],
+                        action=st.session_state["action"]
                     )
                     st.session_state["report_text"] = report_text
                     status.update(label="REPORT COMPLETE!", state="complete")
@@ -1710,8 +1678,6 @@ with tab3:
                 st.markdown(st.session_state["report_text"])
                 st.markdown("#### EXPORT DOCUMENTS")
                 c1, c2 = st.columns(2)
-                
-                # Get hand dominance
                 hand = st.session_state["tele_opt"]["metadata"].get("dominant_side", "unknown")
                 
                 with c1:
@@ -1721,45 +1687,50 @@ with tab3:
                     pdf_f = create_pdf_report(st.session_state["report_text"], sport, action, hand)
                     st.download_button("📜 PDF REPORT", pdf_f, f"{sport}_ANALYSIS.pdf", width="stretch")
                     
-            # --- PART 2: IMPACT REPLAY RENDER ---
-        if "tele_opt" in st.session_state and "event_snapshot" in st.session_state:
+        # --- PART 2: UPDATED IMPACT REPLAY RENDER ---
+        if "tele_opt" in st.session_state:
             st.markdown("---")
             st.markdown("### 🎥 IMPACT REPLAY (0.25x SLOW-MO)")
             
-            # Extract impact frame and FPS
-            impact_f = st.session_state["event_snapshot"].get("frame_number", 0)
+            # Extract basic data
             fps = st.session_state["tele_opt"]["metadata"].get("fps", 30)
+            total_frames = st.session_state.get("total_frames", 300)
             
-            # DEBUG: Show what values we're using
+            # Default to AI detected frame, but let user slide to correct it
+            detected_f = st.session_state.get("event_snapshot", {}).get("frame_number", 0)
+            
+            # Manual Confirmation Slider
+            impact_f = st.slider("MANUALLY CONFIRM IMPACT FRAME", 0, total_frames, int(detected_f))
+            
             col1, col2 = st.columns(2)
             with col1:
-                st.metric("Impact Frame", impact_f)
+                st.metric("Confirmed Frame", impact_f)
             with col2:
                 st.metric("Video FPS", fps)
             
-            # Define paths
-            input_vid = st.session_state["final_video"]  # Use the actual final video
+            input_vid = st.session_state["final_video"]
             slow_mo_output = "impact_replay.mp4"
 
-            # Create the replay video if it doesn't exist
-            if not os.path.exists(slow_mo_output):
-                with st.spinner("🎬 PREPARING GRADUAL SLOW-MOTION REPLAY..."):
+            # Button to trigger/re-trigger the render
+            if st.button("🎬 RENDER / REFRESH REPLAY"):
+                # Force re-render if user changed the frame
+                if os.path.exists(slow_mo_output):
+                    os.remove(slow_mo_output)
+                
+                with st.spinner(f"🎬 RENDERING SLOW-MO AT FRAME {impact_f}..."):
                     try:
-                        # Call the function from Section 1
                         result = apply_impact_slow_mo(input_vid, slow_mo_output, impact_f, fps)
-                        output_path, debug_msg = result if isinstance(result, tuple) else (result, "")
-                        if debug_msg:
-                            with st.expander("🔍 Slow-Mo Debug Info"):
-                                st.code(debug_msg, language="text")
+                        # Ensure we show the video immediately after rendering
+                        st.rerun()
                     except Exception as e:
                         st.error(f"Replay Rendering Error: {e}")
 
-            # Display the video
+            # Display the video only if it exists
             if os.path.exists(slow_mo_output):
                 st.video(slow_mo_output)
-                st.caption("✅ Video starts at regular speed → slows to 0.25x at impact → returns to regular speed")
-        # ------------------------------------        
+                st.caption(f"✅ Replay centered on frame {impact_f}. (Regular -> 0.25x -> Regular)")
 
+        st.markdown("---")
         if st.button("↺ ANALYZE ANOTHER VIDEO", width="stretch"):
             for key in list(st.session_state.keys()): del st.session_state[key]
             st.rerun()
