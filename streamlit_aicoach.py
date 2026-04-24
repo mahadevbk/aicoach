@@ -32,6 +32,38 @@ class NumpyEncoder(json.JSONEncoder):
         if isinstance(obj, np.bool_): return bool(obj)
         return super(NumpyEncoder, self).default(obj)
 
+THIN_JOINT_SPEC = (0, 255, 0)  # Bright Neon Green
+THIN_BONE_SPEC = (255, 255, 255) # Pure White
+
+def apply_advanced_slow_mo(input_path, output_path, impact_frame, fps):
+    \"\"\"
+    Creates a smooth ramped slow-mo: 1x -> 0.2x -> 1x.
+    Uses minterpolate for high-quality frame synthesis.
+    \"\"\"
+    t_impact = impact_frame / fps
+    t_start = max(0, t_impact - 0.5)
+    t_end = t_impact + 0.5
+    
+    # 1s window centered on impact at 0.2x speed (5x PTS)
+    # This adds 4 seconds to the total duration.
+    filter_script = (
+        f\"setpts='if(lt(T,{t_start}), T, \"
+        f\"if(lt(T,{t_end}), {t_start}+(T-{t_start})*5, \"
+        f\"T+4))'\"
+    )
+    
+    # Apply speed change and then interpolate to 60fps for buttery smooth motion
+    cmd = [
+        'ffmpeg', '-y', '-i', input_path,
+        '-filter:v', f\"{filter_script},minterpolate=fps=60:mi_mode=mci:mc_mode=aobmc:me_mode=bidir:vsfm=1\",
+        '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-preset', 'ultrafast',
+        output_path
+    ]
+    
+    import subprocess
+    subprocess.run(cmd, check=True, capture_output=True)
+    return output_path
+
 # ============================================================================
 # 2. REPORT GENERATION FUNCTIONS (Original)
 # ============================================================================
@@ -1174,10 +1206,10 @@ def draw_neon_skeleton(img, lms, alpha=0.3):
     for s, e in FULL_SKELETON:
         p1 = (int(lms[s].x*img.shape[1]), int(lms[s].y*img.shape[0]))
         p2 = (int(lms[e].x*img.shape[1]), int(lms[e].y*img.shape[0]))
-        cv2.line(overlay, p1, p2, (128, 128, 128), 2, cv2.LINE_AA)
+        cv2.line(overlay, p1, p2, THIN_BONE_SPEC, 1, cv2.LINE_AA)
     for i in range(len(lms)):
         pt = (int(lms[i].x*img.shape[1]), int(lms[i].y*img.shape[0]))
-        cv2.circle(overlay, pt, 4, (0, 0, 255), -1, cv2.LINE_AA)
+        cv2.circle(overlay, pt, 2, THIN_JOINT_SPEC, -1, cv2.LINE_AA)
     cv2.addWeighted(overlay, alpha, img, 1 - alpha, 0, img)
 
 def render_pro_stereo(p1, p2, h1, h2, f1, f2, fps):
@@ -1588,6 +1620,51 @@ with tab3:
                     pdf_f = create_pdf_report(st.session_state["report_text"], sport, action, hand)
                     st.download_button("📜 PDF REPORT", pdf_f, f"{sport}_ANALYSIS.pdf", width="stretch")
 
+        # ====================================================================
+        # IMPACT REPLAY RENDERER
+        # ====================================================================
+        if "tele_opt" in st.session_state:
+            st.markdown("---")
+            st.markdown("### 🎥 IMPACT REPLAY SETUP")
+            st.info("SCROLL THE SLIDER TO SELECT THE EXACT IMPACT FRAME ON THE FINAL RENDERED VIDEO.")
+            
+            fps = st.session_state["tele_opt"]["metadata"].get("fps", 30)
+            input_vid = st.session_state["final_video"]
+            
+            # Use OpenCV to get total frame count for the slider
+            cap = cv2.VideoCapture(input_vid)
+            total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+            cap.release()
+            
+            # Default to the impact frame aligned in the Analyze tab
+            default_impact = st.session_state.get("sl1_val", 0)
+            impact_f = st.slider("SELECT IMPACT FRAME", 0, total_frames - 1, int(default_impact), key="impact_replay_slider")
+            
+            # Preview the selected frame
+            cap = cv2.VideoCapture(input_vid)
+            cap.set(cv2.CAP_PROP_POS_FRAMES, impact_f)
+            ret, frame = cap.read()
+            cap.release()
+            if ret:
+                st.image(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB), caption=f"PREVIEW: FRAME {impact_f}", use_container_width=True)
+                
+            slow_mo_output = os.path.join(tempfile.gettempdir(), f"replay_{int(time.time())}.mp4")
+
+            if st.button("🎬 RENDER 0.2X SLOW-MO REPLAY", type="secondary", width="stretch"):
+                with st.spinner("RENDERING SMOOTH SLOW-MO (MINTERPOLATE)... THIS MAY TAKE A MOMENT."):
+                    try:
+                        result = apply_advanced_slow_mo(input_vid, slow_mo_output, impact_f, fps)
+                        st.session_state["slow_mo_video"] = result
+                    except Exception as e:
+                        st.error(f"REPLAY RENDERING ERROR: {e}")
+
+            if "slow_mo_video" in st.session_state:
+                st.markdown("#### ✅ GENERATED REPLAY")
+                st.video(st.session_state["slow_mo_video"])
+                with open(st.session_state["slow_mo_video"], "rb") as f:
+                    st.download_button("📥 DOWNLOAD REPLAY", f, f"{sport}_REPLAY.mp4", width="stretch")
+
+        st.markdown("---")
         if st.button("↺ ANALYZE ANOTHER VIDEO", width="stretch"):
             for key in list(st.session_state.keys()): del st.session_state[key]
             st.rerun()
