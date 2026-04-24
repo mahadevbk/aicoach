@@ -32,54 +32,6 @@ class NumpyEncoder(json.JSONEncoder):
         if isinstance(obj, np.bool_): return bool(obj)
         return super(NumpyEncoder, self).default(obj)
 
-def apply_impact_slow_mo(input_path, output_path, impact_frame, fps):
-    import subprocess
-    import shutil
-
-    # Ensure impact_frame is a valid number
-    try:
-        impact_frame = float(impact_frame)
-    except:
-        impact_frame = 0
-
-    # Safety: If impact is at the start, just return the original video
-    if impact_frame <= 2:
-        shutil.copy(input_path, output_path)
-        return output_path, "Impact too close to start; skipped slow-mo."
-
-    t_impact = impact_frame / fps
-    slowdown = 4.0  # 0.25x speed
-    window = 1.0    # 1 second ramp window
-    
-    t1 = max(0, t_impact - window)
-    t2 = t_impact + window
-
-    # FFmpeg PTS Logic:
-    # 1. T < t1: Play at 1x speed
-    # 2. t1 < T < t2: Play at 0.25x speed (stretched timestamps)
-    # 3. T > t2: Play at 1x speed, but offset by the time added in stage 2
-    pts_expr = (
-        f"if(lt(T,{t1}), T, "
-        f"if(lt(T,{t2}), {t1}+(T-{t1})*{slowdown}, "
-        f"({t1}+({t2}-{t1})*{slowdown})+(T-{t2})))"
-    )
-    
-    filter_expr = f"setpts='({pts_expr})/TB',minterpolate=fps=60:mi_mode=mci"
-
-    cmd = [
-        'ffmpeg', '-y', '-i', input_path,
-        '-vf', filter_expr,
-        '-c:v', 'libx264', '-preset', 'fast', '-crf', '23',
-        output_path
-    ]
-
-    try:
-        subprocess.run(cmd, capture_output=True, text=True, check=True)
-        return output_path, f"Slow-mo centered at {t_impact:.2f}s"
-    except Exception as e:
-        return input_path, f"Error: {str(e)}"
-
-
 # ============================================================================
 # 2. REPORT GENERATION FUNCTIONS (Original)
 # ============================================================================
@@ -1007,23 +959,6 @@ def draw_modern_metric(label, value, delta, icon="⚡"):
         </div>
     """, unsafe_allow_html=True)
 
-def convert_mov_to_mp4(mov_path, mp4_path):
-    """
-    Convert MOV file to MP4 format for consistent processing.
-    Uses FFmpeg with fast copy codec to avoid re-encoding.
-    """
-    import subprocess
-    cmd = [
-        'ffmpeg', '-y', '-i', mov_path,
-        '-c:v', 'copy', '-c:a', 'aac',
-        '-movflags', '+faststart',
-        mp4_path
-    ]
-    result = subprocess.run(cmd, capture_output=True, text=True)
-    if result.returncode != 0:
-        raise Exception(f"MOV to MP4 conversion failed: {result.stderr}")
-    return mp4_path
-
 def display_file_info(uploaded_file):
     if uploaded_file:
         file_size_mb = uploaded_file.size / (1024 * 1024)
@@ -1232,10 +1167,6 @@ def analyze_vid(path, model):
             prev_w = w
     cap.release(); return {"history": history, "raw": raw, "fps": fps, "total": len(history), "impact": impact_f}
 
-# Finer skeletal specs
-THIN_JOINT_SPEC = (0, 255, 0)  # Bright Neon Green joints
-THIN_BONE_SPEC = (255, 255, 255) # Pure White bones
-
 def draw_neon_skeleton(img, lms, alpha=0.3):
     if not lms: return
     overlay = img.copy()
@@ -1243,10 +1174,10 @@ def draw_neon_skeleton(img, lms, alpha=0.3):
     for s, e in FULL_SKELETON:
         p1 = (int(lms[s].x*img.shape[1]), int(lms[s].y*img.shape[0]))
         p2 = (int(lms[e].x*img.shape[1]), int(lms[e].y*img.shape[0]))
-        cv2.line(overlay, p1, p2, THIN_BONE_SPEC, 1, cv2.LINE_AA)
+        cv2.line(overlay, p1, p2, (128, 128, 128), 2, cv2.LINE_AA)
     for i in range(len(lms)):
         pt = (int(lms[i].x*img.shape[1]), int(lms[i].y*img.shape[0]))
-        cv2.circle(overlay, pt, 2, THIN_JOINT_SPEC, -1, cv2.LINE_AA)
+        cv2.circle(overlay, pt, 4, (0, 0, 255), -1, cv2.LINE_AA)
     cv2.addWeighted(overlay, alpha, img, 1 - alpha, 0, img)
 
 def render_pro_stereo(p1, p2, h1, h2, f1, f2, fps):
@@ -1419,16 +1350,14 @@ with tab1:
     
     st.markdown("#### PRIMARY VIEW", unsafe_allow_html=True)
     u1 = st.file_uploader("UPLOAD MAIN ANGLE", type=["mp4","mov"], key="u1_upload", label_visibility="collapsed")
-    if u1:
-        st.caption(f"📊 {u1.name}")
+    if u1: display_file_info(u1)
     
     is_stereo = st.toggle("STEREOGRAPHIC MODE (DUAL VIEW)", value=False, key="st_toggle")
     u2 = None
     if is_stereo:
         st.markdown("#### SECONDARY VIEW", unsafe_allow_html=True)
         u2 = st.file_uploader("UPLOAD SECOND ANGLE", type=["mp4","mov"], key="u2_upload", label_visibility="collapsed")
-        if u2:
-            st.caption(f"📊 {u2.name}")
+        if u2: display_file_info(u2)
 
     if u1:
         if st.button("PROCEED TO ANALYSIS", type="primary", width="stretch"):
@@ -1446,39 +1375,14 @@ with tab1:
 
             model_task = download_model()
             t1_p = os.path.join(tempfile.gettempdir(), f"l_raw.mp4")
-            
-            # Save uploaded file
-            temp_upload = os.path.join(tempfile.gettempdir(), f"l_upload_{int(time.time())}")
-            with open(temp_upload, "wb") as f: 
-                f.write(u1.getbuffer())
-            
-            # Convert MOV to MP4 if needed
-            if u1.name.lower().endswith('.mov'):
-                st.info("🎬 Converting MOV to MP4 for processing...")
-                convert_mov_to_mp4(temp_upload, t1_p)
-                os.remove(temp_upload)
-            else:
-                os.rename(temp_upload, t1_p)
+            with open(t1_p, "wb") as f: f.write(u1.getbuffer())
             
             with st.status(f"ANALYZING {selected_sport.upper()}...") as status:
                 d1 = analyze_vid(t1_p, model_task)
                 d2, t2_p = None, None
                 if is_stereo and u2:
                     t2_p = os.path.join(tempfile.gettempdir(), f"s_raw.mp4")
-                    
-                    # Save second upload
-                    temp_upload2 = os.path.join(tempfile.gettempdir(), f"s_upload_{int(time.time())}")
-                    with open(temp_upload2, "wb") as f: 
-                        f.write(u2.getbuffer())
-                    
-                    # Convert MOV to MP4 if needed
-                    if u2.name.lower().endswith('.mov'):
-                        st.info("🎬 Converting MOV to MP4 for processing...")
-                        convert_mov_to_mp4(temp_upload2, t2_p)
-                        os.remove(temp_upload2)
-                    else:
-                        os.rename(temp_upload2, t2_p)
-                    
+                    with open(t2_p, "wb") as f: f.write(u2.getbuffer())
                     d2 = analyze_vid(t2_p, model_task)
                 
                 st.session_state["data_current"] = {"d1": d1, "d2": d2, "p1": t1_p, "p2": t2_p}
@@ -1601,12 +1505,6 @@ with tab2:
                     tele_opt["metadata"]["detected_actions"] = st.session_state.manual_actions
                 
                 st.session_state["tele_opt"] = tele_opt
-                # Extract and store event_snapshot for slow-mo replay
-                if "event_snapshot" in tele_opt:
-                    st.session_state["event_snapshot"] = tele_opt["event_snapshot"]
-                    st.toast("✅ event_snapshot extracted and stored")
-                else:
-                    st.error("❌ event_snapshot NOT found in tele_opt! Keys available: " + str(list(tele_opt.keys())))
                 #st.session_state["brief"] = generate_brief(tele_opt)
                 st.session_state["brief"] = generate_brief.generate_brief(
 					tele_opt,
@@ -1619,22 +1517,16 @@ with tab2:
             st.success("✅ BIOMECHANICAL RENDER COMPLETE! PLEASE PROCEED TO THE 'RESULTS' TAB ABOVE.")
 
 # Tab 3: Results
-# ============================================================================
-# UPDATED TAB 3: PERFORMANCE ANALYSIS & REPLAY
-# ============================================================================
-
 with tab3:
     if "final_video" not in st.session_state:
         st.warning("⚠️ COMPLETE THE SYNCHRONIZATION AND RENDER FIRST.")
     else:
         s = st.session_state["data_current"]
         sport, action = st.session_state["sport"], st.session_state["action"]
-        
         st.markdown("#### PERFORMANCE ANALYSIS", unsafe_allow_html=True)
         st.video(st.session_state["final_video"])
         
         st.markdown("#### PRO ANALYTICS DASHBOARD")
-        # Keep your existing metrics logic intact
         metrics = get_ai_metrics(s['d1']['raw'], s['d1']['fps'])
         if metrics:
             kpis = generate_sport_kpis(metrics, sport, s['d1']['raw'])
@@ -1655,6 +1547,8 @@ with tab3:
             
             # --- DOWNLOADS & EXPORTS ---
             st.markdown("#### DOWNLOADS & EXPORT")
+            
+            # ZIP Download (Always available after render)
             z_buf = io.BytesIO()
             with zipfile.ZipFile(z_buf, "w") as zf:
                 zf.write(st.session_state["final_video"], "analysis.mp4")
@@ -1664,17 +1558,17 @@ with tab3:
             with cz1:
                 st.download_button("📥 DOWNLOAD ZIP (VIDEO + DATA)", z_buf.getvalue(), f"{sport}_DATA.zip", width="stretch")
             with cz2:
-                json_data = json.dumps(st.session_state["tele_opt"], indent=2, cls=NumpyEncoder)
+                json_data = json.dumps(st.session_state["tele_opt"], indent=2, cls=NpEncoder)
                 st.download_button("💾 RAW JSON", json_data, f"{sport}_TELEMETRY.json", "application/json", width="stretch")
             
             st.markdown("---")
-            
             if st.button("🤖 GENERATE AI COACHING REPORT", type="primary", width="stretch"):
                 with st.status("AI IS ANALYZING...") as status:
+                    #report_text = generate_pro_report(st.session_state["brief"])
                     report_text = generate_pro_report(
-                        st.session_state["brief"],
-                        sport=st.session_state["sport"],
-                        action=st.session_state["action"]
+                    st.session_state["brief"],
+                    sport=st.session_state["sport"],
+                    action=st.session_state["action"]
                     )
                     st.session_state["report_text"] = report_text
                     status.update(label="REPORT COMPLETE!", state="complete")
@@ -1683,67 +1577,17 @@ with tab3:
                 st.markdown(st.session_state["report_text"])
                 st.markdown("#### EXPORT DOCUMENTS")
                 c1, c2 = st.columns(2)
+                
+                # Get hand dominance
                 hand = st.session_state["tele_opt"]["metadata"].get("dominant_side", "unknown")
+                
                 with c1:
                     docx_f = create_docx_report(st.session_state["report_text"], sport, action, hand)
                     st.download_button("📄 WORD DOC", docx_f, f"{sport}_ANALYSIS.docx", width="stretch")
                 with c2:
                     pdf_f = create_pdf_report(st.session_state["report_text"], sport, action, hand)
                     st.download_button("📜 PDF REPORT", pdf_f, f"{sport}_ANALYSIS.pdf", width="stretch")
-                    
-        # ====================================================================
-        # PART 2: VISUAL IMPACT REPLAY RENDERER (SCRUBBER CONNECTED)
-        # ====================================================================
-        if "tele_opt" in st.session_state:
-            st.markdown("---")
-            st.markdown("### 🎥 IMPACT REPLAY SETUP")
-            st.info("Scrub the slider to find the exact impact frame in the preview below.")
-            
-            fps = st.session_state["tele_opt"]["metadata"].get("fps", 30)
-            input_vid = st.session_state["final_video"]
-            
-            # Use OpenCV to get total frame count for the slider
-            cap = cv2.VideoCapture(input_vid)
-            total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-            
-            # Get default detected impact
-            detected_f = st.session_state.get("event_snapshot", {}).get("frame_number", 0)
-            
-            # --- THE SCRUBBER ---
-            impact_f = st.slider("SCRUB TO FIND IMPACT FRAME", 0, total_frames - 1, int(detected_f))
-            
-            # --- THE PREVIEW WINDOW ---
-            # This connects the slider visually to the video
-            cap.set(cv2.CAP_PROP_POS_FRAMES, impact_f)
-            ret, frame = cap.read()
-            if ret:
-                frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                st.image(frame_rgb, caption=f"Previewing Frame: {impact_f}", use_container_width=True)
-            cap.release()
-            
-            slow_mo_output = "impact_replay.mp4"
 
-            # Render Button
-            if st.button("🎬 RENDER SLOW-MO REPLAY", type="secondary"):
-                # Clean old file to force new render with current impact_f
-                if os.path.exists(slow_mo_output):
-                    os.remove(slow_mo_output)
-                
-                with st.spinner(f"🎬 RENDERING 0.25x SLOW-MO AROUND FRAME {impact_f}..."):
-                    try:
-                        # This function must use the 'sandwich' FFmpeg filter
-                        result = apply_impact_slow_mo(input_vid, slow_mo_output, impact_f, fps)
-                        st.rerun() # Refresh to show new video
-                    except Exception as e:
-                        st.error(f"Replay Rendering Error: {e}")
-
-            # Final Replay Display
-            if os.path.exists(slow_mo_output):
-                st.markdown("#### ✅ GENERATED REPLAY")
-                st.video(slow_mo_output)
-                st.caption(f"Replay centered on frame {impact_f} (Speed: 1x ➔ 0.25x ➔ 1x)")
-
-        st.markdown("---")
         if st.button("↺ ANALYZE ANOTHER VIDEO", width="stretch"):
             for key in list(st.session_state.keys()): del st.session_state[key]
             st.rerun()
