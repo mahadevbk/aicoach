@@ -374,34 +374,65 @@ injury or performance outcomes resulting from the application of this data"""
 def create_docx_report(text, sport_name, action, hand):
     doc = Document()
     style = doc.styles['Normal']
-    style.font.name = 'Arial' # Professional universal sans-serif
+    style.font.name = 'Arial'
     style.font.size = Pt(8)
     
-    header = doc.add_heading("", 0)
+    # Main Title - Bitcount
+    header = doc.add_paragraph()
     header.alignment = WD_ALIGN_PARAGRAPH.CENTER
     run = header.add_run("VECTOR VICTOR AI")
     run.font.name = 'Bitcount Prop Single'
     run.bold = True
     run.font.size = Pt(10)
     
+    # Subtitle - Arial 8pt Bold
     subtitle = doc.add_paragraph()
     subtitle.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    s_run = subtitle.add_run("BIO MECHANICAL ANALYSIS REPORT")
-    s_run.font.name = 'Bitcount Prop Single'
+    s_run = subtitle.add_run("BIOMECHANICAL ANALYSIS REPORT")
+    s_run.font.name = 'Arial'
     s_run.bold = True
     s_run.font.size = Pt(8)
     
+    # Metadata - Arial 8pt
     p_date = doc.add_paragraph()
-    p_date.add_run("Date: ").bold = True
-    p_date.add_run(time.strftime('%Y-%m-%d'))
+    p_date.paragraph_format.space_before = Pt(6)
+    date_label = p_date.add_run("Date: ")
+    date_label.font.name = 'Arial'
+    date_label.font.size = Pt(8)
+    date_label.bold = True
+    date_value = p_date.add_run(time.strftime('%Y-%m-%d'))
+    date_value.font.name = 'Arial'
+    date_value.font.size = Pt(8)
 
     p_sport = doc.add_paragraph()
-    p_sport.add_run("Sport: ").bold = True
-    p_sport.add_run(sport_name)
+    sport_label = p_sport.add_run("Sport: ")
+    sport_label.font.name = 'Arial'
+    sport_label.font.size = Pt(8)
+    sport_label.bold = True
+    sport_value = p_sport.add_run(sport_name)
+    sport_value.font.name = 'Arial'
+    sport_value.font.size = Pt(8)
     
     p_activity = doc.add_paragraph()
-    p_activity.add_run("Activity: ").bold = True
-    p_activity.add_run(action)
+    action_label = p_activity.add_run("Activity: ")
+    action_label.font.name = 'Arial'
+    action_label.font.size = Pt(8)
+    action_label.bold = True
+    action_value = p_activity.add_run(action)
+    action_value.font.name = 'Arial'
+    action_value.font.size = Pt(8)
+    
+    p_hand = doc.add_paragraph()
+    hand_label = p_hand.add_run("Dominant Hand: ")
+    hand_label.font.name = 'Arial'
+    hand_label.font.size = Pt(8)
+    hand_label.bold = True
+    hand_value = p_hand.add_run(hand)
+    hand_value.font.name = 'Arial'
+    hand_value.font.size = Pt(8)
+    
+    # Add spacing after metadata
+    doc.add_paragraph()
     
     # Access the footer of the first section (assuming a single section document)
     section = doc.sections[0]
@@ -465,36 +496,68 @@ def create_docx_report(text, sport_name, action, hand):
     
     # Parse and add the report text content
     lines = text.split('\n')
+    current_table = None
+    current_table_cols = 0
+    
     for line in lines:
         stripped = line.strip()
         if stripped:  # Only add non-empty lines
             # Check if it's a heading (lines with #)
             if stripped.startswith('#'):
+                current_table = None  # Reset table context
                 # Remove # symbols and add as heading
                 heading_text = stripped.lstrip('#').strip()
                 level = len(stripped) - len(stripped.lstrip('#'))
-                # Limit heading levels to valid range (1-9)
-                level = min(level, 9)
+                # Limit heading levels to valid range (1-2)
+                level = min(level, 2)
                 if level > 0:
-                    doc.add_heading(heading_text, level=level)
+                    heading = doc.add_heading(heading_text, level=level)
+                    # Ensure heading uses Arial 8pt bold
+                    for run in heading.runs:
+                        run.font.name = 'Arial'
+                        run.font.size = Pt(8)
+                        run.bold = True
                 else:
-                    doc.add_paragraph(heading_text, style='Normal')
+                    p = doc.add_paragraph(heading_text, style='Normal')
+                    for run in p.runs:
+                        run.font.name = 'Arial'
+                        run.font.size = Pt(8)
+                        run.bold = True
             # Check if it's a table row (contains |)
             elif '|' in stripped and '---' not in stripped:
-                # Simple table handling - split by pipes
+                # Table handling - extract cells
                 cells = [c.strip() for c in stripped.split('|') if c.strip()]
                 if cells:
-                    # Create table with as many columns as needed
-                    table = doc.add_table(rows=1, cols=len(cells))
-                    table.style = 'Light Grid Accent 1'
-                    # Add cells to first row
+                    # Check if we need a new table or continue existing
+                    if current_table is None or len(cells) != current_table_cols:
+                        current_table = doc.add_table(rows=1, cols=len(cells))
+                        current_table.style = 'Light Grid Accent 1'
+                        current_table_cols = len(cells)
+                    else:
+                        # Add row to existing table
+                        current_table.add_row()
+                    
+                    # Fill cells with text and proper formatting
+                    row_idx = len(current_table.rows) - 1
                     for i, cell_text in enumerate(cells):
-                        table.rows[0].cells[i].text = cell_text
+                        cell = current_table.rows[row_idx].cells[i]
+                        cell.text = cell_text
+                        # Format cell text
+                        for para in cell.paragraphs:
+                            for run in para.runs:
+                                run.font.name = 'Arial'
+                                run.font.size = Pt(8)
             # Regular paragraph
             else:
+                current_table = None  # Reset table context
                 p = doc.add_paragraph(stripped, style='Normal')
                 p.paragraph_format.space_after = Pt(6)
+                # Ensure paragraph uses Arial 8pt
+                for run in p.runs:
+                    run.font.name = 'Arial'
+                    run.font.size = Pt(8)
         else:
+            current_table = None  # Reset table context on empty line
             # Empty line = paragraph break
             doc.add_paragraph()
 
