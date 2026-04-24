@@ -460,9 +460,45 @@ def create_docx_report(text, sport_name, action, hand):
     run_numpages._r.append(instrText2)
     run_numpages._r.append(fldChar4)
 
-    bio = io.BytesIO()
-    doc.save(bio)
-    return bio.getvalue()
+    # Add the actual report content
+    doc.add_paragraph()  # Add spacing after metadata
+    
+    # Parse and add the report text content
+    lines = text.split('\n')
+    for line in lines:
+        stripped = line.strip()
+        if stripped:  # Only add non-empty lines
+            # Check if it's a heading (lines with #)
+            if stripped.startswith('#'):
+                # Remove # symbols and add as heading
+                heading_text = stripped.lstrip('#').strip()
+                level = len(stripped) - len(stripped.lstrip('#'))
+                # Limit heading levels to valid range (1-9)
+                level = min(level, 9)
+                if level > 0:
+                    doc.add_heading(heading_text, level=level)
+                else:
+                    doc.add_paragraph(heading_text, style='Normal')
+            # Check if it's a table row (contains |)
+            elif '|' in stripped and '---' not in stripped:
+                # Simple table handling - split by pipes
+                cells = [c.strip() for c in stripped.split('|') if c.strip()]
+                if cells:
+                    # Create table with as many columns as needed
+                    table = doc.add_table(rows=1, cols=len(cells))
+                    table.style = 'Light Grid Accent 1'
+                    # Add cells to first row
+                    for i, cell_text in enumerate(cells):
+                        table.rows[0].cells[i].text = cell_text
+            # Regular paragraph
+            else:
+                p = doc.add_paragraph(stripped, style='Normal')
+                p.paragraph_format.space_after = Pt(6)
+        else:
+            # Empty line = paragraph break
+            doc.add_paragraph()
+
+    # Save document to BytesIO
     bio = io.BytesIO()
     doc.save(bio)
     return bio.getvalue()
