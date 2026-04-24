@@ -354,8 +354,15 @@ def generate_pro_report(brief_content, sport="GENERAL", action="MOVEMENT"):
             generation_config=generation_config
         )
         
-        return response.text
-        
+        return response.text + """
+
+Disclaimer                         
+                                                                                                                    
+This report is generated via automated computer-vision telemetry and is intended for performance-tracking and   
+educational purposes only. Metrics (angles, velocities, and synchronization) are algorithmic estimates and do   
+not constitute medical advice or a clinical diagnosis. Users should consult with a certified professional coach 
+or healthcare provider before initiating new training intensities. Vector Victor AI assumes no liability for    
+injury or performance outcomes resulting from the application of this data"""
     except Exception as e:
         # Check if the error is due to the model name (in case of regional rollout delays)
         return f"⚠️ AI Generation Error: {str(e)}"
@@ -394,83 +401,19 @@ def create_docx_report(text, sport_name, action, hand):
     p_activity.add_run("Activity: ").bold = True
     p_activity.add_run(action)
     
-    p_hand = doc.add_paragraph()
-    p_hand.add_run("Hand dominance: ").bold = True
-    p_hand.add_run(hand)
-    doc.add_paragraph("_" * 50)
+    # Add footer with disclaimer and page number
+    doc.add_page_number() # Adds page number to the footer
+    
+    # Access the footer and add disclaimer text
+    sections = doc.sections
+    for section in sections:
+        footer = section.footer
+        if footer:
+            p = footer.paragraphs[0] if footer.paragraphs else footer.add_paragraph()
+            run = p.add_run("Automated biomechanical analysis for educational use only. Consult a professional for clinical or medical assessment. ")
+            run.font.size = Pt(6) # Size 6 text
+            run.font.name = 'Arial'
 
-    lines = text.split('\n')
-    table_data = []
-    in_table = False
-
-    for line in lines:
-        clean_line = line.strip()
-        if '|' in clean_line:
-            if '---' in clean_line: continue
-            cells = [c.strip() for c in clean_line.split('|') if c.strip()]
-            if cells:
-                table_data.append(cells)
-                in_table = True
-            continue
-        else:
-            if in_table and table_data:
-                doc_table = doc.add_table(rows=len(table_data), cols=len(table_data[0]))
-                doc_table.style = 'Table Grid'
-                for r_idx, row in enumerate(table_data):
-                    for c_idx, val in enumerate(row):
-                        if c_idx < len(doc_table.columns):
-                            cell = doc_table.cell(r_idx, c_idx)
-                            cell.text = val
-                            for paragraph in cell.paragraphs:
-                                for run in paragraph.runs:
-                                    run.font.size = Pt(8)
-                                    if r_idx == 0: run.bold = True # Bold header row
-                doc.add_paragraph()
-                table_data = []
-                in_table = False
-
-        if not clean_line: continue
-        if clean_line.startswith('# '): 
-            h = doc.add_heading(clean_line.replace('# ', ''), level=0)
-            if h.runs: h.runs[0].font.size = Pt(8)
-        elif clean_line.startswith('## '): 
-            h = doc.add_heading(clean_line.replace('## ', ''), level=1)
-            if h.runs: h.runs[0].font.size = Pt(8)
-        elif clean_line.startswith('### '):
-            h = doc.add_heading(clean_line.replace('### ', ''), level=2)
-            if h.runs: h.runs[0].font.size = Pt(8)
-        elif clean_line.startswith('* ') or clean_line.startswith('- '):
-            p = doc.add_paragraph(style='List Bullet')
-            p.paragraph_format.space_after = Pt(4)
-            content = clean_line[2:]
-            if ':' in content:
-                title, desc = content.split(':', 1)
-                run_t = p.add_run(title + ":")
-                run_t.bold = True
-                run_t.font.name = 'Arial'
-                run_t.font.size = Pt(8)
-                run_d = p.add_run(desc)
-                run_d.font.name = 'Arial'
-                run_d.font.size = Pt(8)
-            else:
-                run = p.add_run(content)
-                run.font.name = 'Arial'
-                run.font.size = Pt(8)
-        else:
-            p = doc.add_paragraph()
-            p.paragraph_format.space_after = Pt(6)
-            if '**' in clean_line:
-                parts = clean_line.split('**')
-                for i, part in enumerate(parts):
-                    run = p.add_run(part)
-                    run.font.name = 'Arial'
-                    run.font.size = Pt(8)
-                    if i % 2 == 1: run.bold = True
-            else:
-                run = p.add_run(clean_line)
-                run.font.name = 'Arial'
-                run.font.size = Pt(8)
-                
     bio = io.BytesIO()
     doc.save(bio)
     return bio.getvalue()
@@ -510,9 +453,11 @@ class PDFReport(FPDF):
 
     def footer(self):
         self.set_y(-15)
-        self.set_font('helvetica', '', 8)
+        self.set_font('helvetica', '', 6) # Size 6 text
         self.set_text_color(128, 128, 128)
-        self.cell(0, 10, f'Page {self.page_no()}/{{nb}} | Vector Victor Biomechanics Engine', align='C')
+        # Add disclaimer and page number
+        disclaimer = "Automated biomechanical analysis for educational use only. Consult a professional for clinical or medical assessment."
+        self.cell(0, 10, f"{disclaimer} | Page {self.page_no()}/{{nb}}", align='C')
 
 def create_pdf_report(text, sport_name, action, hand):
     def clean_for_pdf(s):
