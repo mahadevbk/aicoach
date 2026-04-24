@@ -17,6 +17,8 @@ import google.generativeai as genai
 from docx import Document
 from docx.shared import Pt, RGBColor
 from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.oxml import OxmlElement
+from docx.oxml.ns import qn
 from fpdf import FPDF
 from fpdf.enums import XPos, YPos
 
@@ -406,27 +408,57 @@ def create_docx_report(text, sport_name, action, hand):
     footer = section.footer
     
     # Add page number field and disclaimer text
-    # We add a paragraph to the footer for the disclaimer and page number.
     footer_paragraph = footer.add_paragraph()
-    footer_paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER # Center align the footer text.
+    footer_paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
     
     # Add disclaimer text
-    run_disclaimer = footer_paragraph.add_run("Automated biomechanical analysis for educational use only. Consult a professional for clinical or medical assessment. ")
-    run_disclaimer.font.size = Pt(6) # Size 6 text
+    run_disclaimer = footer_paragraph.add_run("Automated biomechanical analysis for educational use only. Consult a professional for clinical or medical assessment. | Page ")
+    run_disclaimer.font.size = Pt(6)
     run_disclaimer.font.name = 'Arial'
     
-    # Add page number field using its code representation for "Page X of Y" format
-    footer_paragraph.add_run(" | Page ") # Separator text
-    run_page_num_field = footer_paragraph.add_run()
-    run_page_num_field.add_field('PAGE') # Inserts the PAGE field code
-    run_page_num_field.font.size = Pt(6)
-    run_page_num_field.font.name = 'Arial'
+    # Add PAGE field code using proper python-docx XML manipulation
+    run_page = footer_paragraph.add_run()
+    run_page.font.size = Pt(6)
+    run_page.font.name = 'Arial'
     
-    footer_paragraph.add_run(" of ")
-    run_total_pages_field = footer_paragraph.add_run()
-    run_total_pages_field.add_field('NUMPAGES') # Inserts the NUMPAGES field code
-    run_total_pages_field.font.size = Pt(6)
-    run_total_pages_field.font.name = 'Arial'
+    # Create field elements for PAGE
+    fldChar1 = OxmlElement('w:fldChar')
+    fldChar1.set(qn('w:fldCharType'), 'begin')
+    
+    instrText = OxmlElement('w:instrText')
+    instrText.set(qn('xml:space'), 'preserve')
+    instrText.text = 'PAGE'
+    
+    fldChar2 = OxmlElement('w:fldChar')
+    fldChar2.set(qn('w:fldCharType'), 'end')
+    
+    run_page._r.append(fldChar1)
+    run_page._r.append(instrText)
+    run_page._r.append(fldChar2)
+    
+    # Add " of " text
+    run_of = footer_paragraph.add_run(" of ")
+    run_of.font.size = Pt(6)
+    run_of.font.name = 'Arial'
+    
+    # Add NUMPAGES field code
+    run_numpages = footer_paragraph.add_run()
+    run_numpages.font.size = Pt(6)
+    run_numpages.font.name = 'Arial'
+    
+    fldChar3 = OxmlElement('w:fldChar')
+    fldChar3.set(qn('w:fldCharType'), 'begin')
+    
+    instrText2 = OxmlElement('w:instrText')
+    instrText2.set(qn('xml:space'), 'preserve')
+    instrText2.text = 'NUMPAGES'
+    
+    fldChar4 = OxmlElement('w:fldChar')
+    fldChar4.set(qn('w:fldCharType'), 'end')
+    
+    run_numpages._r.append(fldChar3)
+    run_numpages._r.append(instrText2)
+    run_numpages._r.append(fldChar4)
 
     bio = io.BytesIO()
     doc.save(bio)
