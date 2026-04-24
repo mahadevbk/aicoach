@@ -38,25 +38,24 @@ THIN_BONE_SPEC = (255, 255, 255) # Pure White
 def apply_advanced_slow_mo(input_path, output_path, impact_frame, fps):
     """
     Creates a smooth ramped slow-mo: 1x -> 0.2x -> 1x.
-    Uses minterpolate for high-quality frame synthesis.
+    Uses simplified minterpolate for better compatibility.
     """
     t_impact = impact_frame / fps
     t_start = max(0, t_impact - 0.5)
     t_end = t_impact + 0.5
     
-    # 1s window centered on impact at 0.2x speed (5x PTS)
-    # This adds 4 seconds to the total duration.
+    # 1s window at 0.2x speed (5x PTS) adds 4s to total length
     filter_script = (
         f"setpts='if(lt(T,{t_start}), T, "
         f"if(lt(T,{t_end}), {t_start}+(T-{t_start})*5, "
         f"T+4))'"
     )
     
-    # Apply speed change and then interpolate to 60fps for buttery smooth motion
+    # Simplified minterpolate settings
     cmd = [
         'ffmpeg', '-y', '-i', input_path,
-        '-filter:v', f"{filter_script},minterpolate=fps=60:mi_mode=mci:mc_mode=aobmc:me_mode=bidir:vsfm=1",
-        '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-preset', 'ultrafast',
+        '-filter:v', f"{filter_script},minterpolate=fps=60:mi_mode=mci:mc_mode=obmc:me_mode=bidir",
+        '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-preset', 'ultrafast', '-crf', '23',
         output_path
     ]
     
@@ -1199,17 +1198,26 @@ def analyze_vid(path, model):
             prev_w = w
     cap.release(); return {"history": history, "raw": raw, "fps": fps, "total": len(history), "impact": impact_f}
 
-def draw_neon_skeleton(img, lms, alpha=0.3):
+def draw_neon_skeleton(img, lms, alpha=0.5):
     if not lms: return
     overlay = img.copy()
-    FULL_SKELETON = [(0,1), (1,2), (2,3), (3,7), (0,4), (4,5), (5,6), (6,8), (9,10), (11,12), (11,13), (13,15), (12,14), (14,16), (11,23), (12,24), (23,24), (23,25), (25,27), (24,26), (26,28)]
+    # Finer, more specific skeletal structure
+    FULL_SKELETON = [
+        (11,12), (11,13), (13,15), (12,14), (14,16), # Shoulders and arms
+        (11,23), (12,24), (23,24), # Torso
+        (23,25), (25,27), (24,26), (26,28) # Legs
+    ]
+    # Draw connections (Pure White, thickness 1 for fineness)
     for s, e in FULL_SKELETON:
         p1 = (int(lms[s].x*img.shape[1]), int(lms[s].y*img.shape[0]))
         p2 = (int(lms[e].x*img.shape[1]), int(lms[e].y*img.shape[0]))
-        cv2.line(overlay, p1, p2, THIN_BONE_SPEC, 1, cv2.LINE_AA)
-    for i in range(len(lms)):
+        cv2.line(overlay, p1, p2, (255, 255, 255), 1, cv2.LINE_AA)
+    
+    # Draw joints (Neon Green, radius 2 for fineness)
+    for i in [11, 12, 13, 14, 15, 16, 23, 24, 25, 26, 27, 28]:
         pt = (int(lms[i].x*img.shape[1]), int(lms[i].y*img.shape[0]))
-        cv2.circle(overlay, pt, 2, THIN_JOINT_SPEC, -1, cv2.LINE_AA)
+        cv2.circle(overlay, pt, 2, (0, 255, 0), -1, cv2.LINE_AA)
+        
     cv2.addWeighted(overlay, alpha, img, 1 - alpha, 0, img)
 
 def render_pro_stereo(p1, p2, h1, h2, f1, f2, fps):
@@ -1226,13 +1234,13 @@ def render_pro_stereo(p1, p2, h1, h2, f1, f2, fps):
     for i in range(len(h1)):
         ret1, f1_img = cap1.read()
         if not ret1: break
-        if h1[i]: draw_neon_skeleton(f1_img, h1[i], alpha=0.15)
+        if h1[i]: draw_neon_skeleton(f1_img, h1[i], alpha=0.4) # Increased alpha for visibility
         frame_to_write = cv2.resize(f1_img, (w1, target_h))
         if p2:
             idx2 = i - off
             if 0 <= idx2 < len(h2):
                 cap2.set(1, idx2); _, f2_img = cap2.read()
-                if h2[idx2]: draw_neon_skeleton(f2_img, h2[idx2], alpha=0.15)
+                if h2[idx2]: draw_neon_skeleton(f2_img, h2[idx2], alpha=0.4) # Increased alpha for visibility
                 f2_img = cv2.resize(f2_img, (w2, target_h))
             else: f2_img = np.zeros((target_h, w2, 3), dtype=np.uint8)
             frame_to_write = np.hstack((frame_to_write, f2_img))
