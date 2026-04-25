@@ -264,28 +264,29 @@ SPORT & ACTION CONTEXT:
 
 MANDATORY REPORT STRUCTURE:
 1. Executive Summary (2-3 sentences on overall {action.lower()} quality). Mention dominant side here.
-2. Specialist coach's analysis, strengths and weaknesses.
-3. Performance Scores table: 
+2. Specialist coach's analysis, strengths and weaknesses. Make it detailed.
+3. Coaching Recommendations (max 5): Make these detailed.
+   - Recommendation | Priority (HIGH/MEDIUM/LOW) | Specific Cue | Progressive Drill
+   - Focus on: {', '.join(context['common_issues'])}
+4. Performance Scores table: 
    - Category | Score/100 | vs Benchmark | Assessment
    - Include scores for: Technique, Timing, Power, Balance/Stability, Follow-Through, Kinetic Chain, Consistency
-4. Key Measurements table: 
+5. Key Measurements table: 
    - Metric | Value | Benchmark | Status (Good/Attention/Issue)
    - Compare all provided measurements to benchmarks
-4. Movement Progression Analysis:
+6. Movement Progression Analysis:
    - Describe the movement from START → MID-POINT → FINISH
    - Identify timing of key events
    - Assess smoothness and efficiency
-6. Kinetic Chain Assessment:
+7. Kinetic Chain Assessment:
    - Analyze sequential energy transfer through: {context['primary_chain']}
    - Identify any breaks or delays in the chain
    - Assess efficiency of each segment
-7. Critical Technical Issues (max 3):
+8. Critical Technical Issues (max 3):
    - Issue | Impact | Severity (HIGH/MEDIUM/LOW)
    - Explain the specific biomechanical problem
    - Note if it affects performance vs safety
-8. Coaching Recommendations (max 5):
-   - Recommendation | Priority (HIGH/MEDIUM/LOW) | Specific Cue | Progressive Drill
-   - Focus on: {', '.join(context['common_issues'])}
+
 9. Injury Risk Assessment:
    - Identify any movement patterns suggesting injury risk
    - Areas of concern: {', '.join(context['injury_risks'])}
@@ -305,7 +306,7 @@ CRITICAL REQUIREMENTS:
 - Note any data quality limitations that affect interpretation
 
 TONE: Professional, technical but accessible, positive but honest.
-LENGTH: 900-1100 words
+LENGTH: 1500-2000 words
 START WITH: "VECTOR VICTOR AI - BIO MECHANICAL ANALYSIS"
 """
     

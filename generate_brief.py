@@ -466,19 +466,54 @@ Arm coordination:
     brief += f"""
 
 ## SECTION 10 — REPORT INSTRUCTIONS
-Generate a coaching report with these sections:
-1. Overview (2-3 sentences specific to {action.lower()})
-2. Experts Coach's review of the athletes performance. The good and the weaknesses. Be encouraging and positive.
-3. Coaching Recommendations (focused on {action.lower()} technique)
-4. Practice Plan table
-5. Overall Scores table
-6. Risk assessments
-7. Key Measurements table
-8. {action}-Specific Phase Analysis
-9. Data Notes
-10. No player name has been provided in this report.
+SPORT & ACTION CONTEXT:
 
-Tone: Encouraging, professional, direct, action-specific. Length: 700-900 words.
+MANDATORY REPORT STRUCTURE:
+1. Executive Summary (2-3 sentences on overall {action.lower()} quality). Mention dominant side here.
+2. Specialist coach's analysis, strengths and weaknesses. Make it detailed.
+3. Coaching Recommendations (max 5): Make these detailed.
+   - Recommendation | Priority (HIGH/MEDIUM/LOW) | Specific Cue | Progressive Drill
+   - Focus on: {', '.join(context['common_issues'])}
+4. Performance Scores table: 
+   - Category | Score/100 | vs Benchmark | Assessment
+   - Include scores for: Technique, Timing, Power, Balance/Stability, Follow-Through, Kinetic Chain, Consistency
+5. Key Measurements table: 
+   - Metric | Value | Benchmark | Status (Good/Attention/Issue)
+   - Compare all provided measurements to benchmarks
+6. Movement Progression Analysis:
+   - Describe the movement from START → MID-POINT → FINISH
+   - Identify timing of key events
+   - Assess smoothness and efficiency
+7. Kinetic Chain Assessment:
+   - Analyze sequential energy transfer through: {context['primary_chain']}
+   - Identify any breaks or delays in the chain
+   - Assess efficiency of each segment
+8. Critical Technical Issues (max 3):
+   - Issue | Impact | Severity (HIGH/MEDIUM/LOW)
+   - Explain the specific biomechanical problem
+   - Note if it affects performance vs safety
+
+9. Injury Risk Assessment:
+   - Identify any movement patterns suggesting injury risk
+   - Areas of concern: {', '.join(context['injury_risks'])}
+   - Recommendations for prevention
+10. Summary:
+   - One sentence on current level
+   - Next 3 priorities for improvement
+   - Estimated timeline to see improvement
+
+CRITICAL REQUIREMENTS:
+- Always reference benchmark values from the brief when available
+- Identify bilateral asymmetries (left vs right) and their impact
+- Explain WHY issues matter, not just WHAT to do
+- Distinguish between TIMING problems vs STRENGTH/MOBILITY problems
+- Base all recommendations strictly on the telemetry data provided
+- Use professional, direct language but remain encouraging
+- Note any data quality limitations that affect interpretation
+
+TONE: Professional, technical but accessible, positive but honest.
+LENGTH: 1500-2000 words
+START WITH: "VECTOR VICTOR AI - BIO MECHANICAL ANALYSIS"
 
 === END OF BRIEF ===
 """
