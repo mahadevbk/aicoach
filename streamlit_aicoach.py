@@ -653,7 +653,10 @@ def create_pdf_report(text, sport_name, action, hand):
     for line in lines:
         clean_line = clean_for_pdf(line.strip())
         if '|' in clean_line:
-            if '---' in clean_line: continue
+            # Check if this is a markdown separator (only contains | : - space)
+            is_separator = all(c in '| :-' for c in clean_line)
+            if is_separator:
+                continue
             cells = [c.strip() for c in clean_line.split('|') if c.strip()]
             if cells:
                 table_data.append(cells)
@@ -661,16 +664,24 @@ def create_pdf_report(text, sport_name, action, hand):
             continue
         else:
             if in_table and table_data:
-                # Use fpdf2 table feature for automatic wrapping
+                # Use fpdf2 table feature with styled headers
                 with pdf.table(borders_layout="ALL", gutter_height=1, text_align="LEFT") as table:
                     for r_idx, row_data in enumerate(table_data):
                         row = table.row()
                         if r_idx == 0:
+                            # Header row - bold font with blue background
                             pdf.set_font(f_main, 'B', 8)
+                            for val in row_data:
+                                # Set cell style with blue background (matching Light Grid Accent 1)
+                                cell = row.cell(val)
+                                # Apply blue shading to header cells
+                                cell.style.fill_color = (79, 129, 189)  # Blue from Light Grid Accent 1
+                                cell.style.text_color = (255, 255, 255)  # White text
                         else:
+                            # Data rows - normal font
                             pdf.set_font(f_main, '', 8)
-                        for val in row_data:
-                            row.cell(val)
+                            for val in row_data:
+                                row.cell(val)
                 pdf.ln(4)
                 table_data = []
                 in_table = False
