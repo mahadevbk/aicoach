@@ -524,29 +524,34 @@ def create_docx_report(text, sport_name, action, hand):
                         run.font.size = Pt(8)
                         run.bold = True
             # Check if it's a table row (contains |) but NOT a markdown separator
-            elif '|' in stripped and '---' not in stripped and ':' not in stripped:
-                # Table handling - extract cells
-                cells = [c.strip() for c in stripped.split('|') if c.strip()]
-                if cells:
-                    # Check if we need a new table or continue existing
-                    if current_table is None or len(cells) != current_table_cols:
-                        current_table = doc.add_table(rows=1, cols=len(cells))
-                        current_table.style = 'Light Grid Accent 1'
-                        current_table_cols = len(cells)
-                    else:
-                        # Add row to existing table
-                        current_table.add_row()
-                    
-                    # Fill cells with text and proper formatting
-                    row_idx = len(current_table.rows) - 1
-                    for i, cell_text in enumerate(cells):
-                        cell = current_table.rows[row_idx].cells[i]
-                        cell.text = cell_text
-                        # Format cell text
-                        for para in cell.paragraphs:
-                            for run in para.runs:
-                                run.font.name = 'Arial'
-                                run.font.size = Pt(8)
+            # Markdown separators only contain pipes, dashes, colons, and spaces
+            elif '|' in stripped:
+                # Check if this is a markdown separator (all chars are | : - or space)
+                is_separator = all(c in '| :-' for c in stripped)
+                
+                if not is_separator:  # It's real data, not a separator
+                    # Table handling - extract cells
+                    cells = [c.strip() for c in stripped.split('|') if c.strip()]
+                    if cells:
+                        # Check if we need a new table or continue existing
+                        if current_table is None or len(cells) != current_table_cols:
+                            current_table = doc.add_table(rows=1, cols=len(cells))
+                            current_table.style = 'Light Grid Accent 1'
+                            current_table_cols = len(cells)
+                        else:
+                            # Add row to existing table
+                            current_table.add_row()
+                        
+                        # Fill cells with text and proper formatting
+                        row_idx = len(current_table.rows) - 1
+                        for i, cell_text in enumerate(cells):
+                            cell = current_table.rows[row_idx].cells[i]
+                            cell.text = cell_text
+                            # Format cell text
+                            for para in cell.paragraphs:
+                                for run in para.runs:
+                                    run.font.name = 'Arial'
+                                    run.font.size = Pt(8)
             # Regular paragraph
             else:
                 current_table = None  # Reset table context
