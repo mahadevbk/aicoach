@@ -671,12 +671,13 @@ def create_pdf_report(text, sport_name, action, hand):
                         if r_idx == 0:
                             # Header row - bold font with blue background
                             pdf.set_font(f_main, 'B', 8)
+                            pdf.set_fill_color(79, 129, 189)   # Blue background
+                            pdf.set_text_color(255, 255, 255)  # White text
                             for val in row_data:
-                                # Set cell style with blue background (matching Light Grid Accent 1)
-                                cell = row.cell(val)
-                                # Apply blue shading to header cells
-                                cell.style.fill_color = (79, 129, 189)  # Blue from Light Grid Accent 1
-                                cell.style.text_color = (255, 255, 255)  # White text
+                                row.cell(val)
+                            # Reset colors for next rows
+                            pdf.set_fill_color(255, 255, 255)  # White background
+                            pdf.set_text_color(0, 0, 0)        # Black text
                         else:
                             # Data rows - normal font
                             pdf.set_font(f_main, '', 8)
