@@ -359,10 +359,8 @@ def generate_pro_report(brief_content, sport="GENERAL", action="MOVEMENT"):
         
         return response.text + """
 
-Disclaimer                         
-                                                                                                                    
-This report is generated via automated computer-vision telemetry and is intended for performance-tracking and educational purposes only. Metrics (angles, velocities, and synchronization) are algorithmic estimates and do   
-not constitute medical advice or a clinical diagnosis. Users should consult with a certified professional coach or healthcare provider before initiating new training intensities. Vector Victor AI assumes no liability for injury or performance outcomes resulting from the application of this data"""
+Disclaimer
+This report is generated via automated computer-vision telemetry and is intended for performance-tracking and educational purposes only. Metrics (angles, velocities, and synchronization) are algorithmic estimates and do not constitute medical advice or a clinical diagnosis. Users should consult with a certified professional coach or healthcare provider before initiating new training intensities. Vector Victor AI assumes no liability for injury or performance outcomes resulting from the application of this data"""
     except Exception as e:
         # Check if the error is due to the model name (in case of regional rollout delays)
         return f"⚠️ AI Generation Error: {str(e)}"
