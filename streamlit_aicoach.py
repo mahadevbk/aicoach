@@ -523,8 +523,8 @@ def create_docx_report(text, sport_name, action, hand):
                         run.font.name = 'Arial'
                         run.font.size = Pt(8)
                         run.bold = True
-            # Check if it's a table row (contains |)
-            elif '|' in stripped and '---' not in stripped:
+            # Check if it's a table row (contains |) but NOT a markdown separator
+            elif '|' in stripped and '---' not in stripped and ':' not in stripped:
                 # Table handling - extract cells
                 cells = [c.strip() for c in stripped.split('|') if c.strip()]
                 if cells:
